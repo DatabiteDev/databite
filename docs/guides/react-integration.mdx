@@ -1,0 +1,793 @@
+---
+title: "React Integration"
+description: "Learn how to integrate Databite connectors with React applications using @databite/connect and @databite/flow"
+---
+
+import { Steps, Card, Note, Warning, Tip } from "@mintlify/components";
+
+# React Integration
+
+React integration allows you to build user interfaces for your Databite connectors. This guide shows you how to use `@databite/connect` and `@databite/flow` to create interactive React components for authentication, data management, and user workflows.
+
+## Overview
+
+React integration in Databite provides:
+
+- **Pre-built UI Components** for common patterns
+- **Hooks** for state management and data fetching
+- **Flow Rendering** for dynamic user interfaces
+- **Theme Support** for consistent styling
+- **TypeScript Support** for type safety
+
+## Basic Setup
+
+### Installation
+
+```bash
+npm install @databite/connect @databite/flow
+```
+
+### Provider Setup
+
+```tsx
+import React from "react";
+import { DatabiteProvider } from "@databite/connect";
+import { FlowProvider } from "@databite/flow";
+
+function App() {
+  return (
+    <DatabiteProvider
+      config={{
+        apiUrl: process.env.REACT_APP_DATABITE_API_URL,
+        apiKey: process.env.REACT_APP_DATABITE_API_KEY,
+      }}
+    >
+      <FlowProvider>
+        <YourApp />
+      </FlowProvider>
+    </DatabiteProvider>
+  );
+}
+
+export default App;
+```
+
+## Authentication Components
+
+### ConnectModal Component
+
+```tsx
+import React, { useState } from "react";
+import { ConnectModal, useConnect } from "@databite/connect";
+
+function AuthExample() {
+  const [isOpen, setIsOpen] = useState(false);
+  const { connections, createConnection, deleteConnection } = useConnect();
+
+  const handleConnect = async (connectorId: string, config: any) => {
+    try {
+      await createConnection(connectorId, config);
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Connection failed:", error);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>Connect Service</button>
+
+      <ConnectModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onConnect={handleConnect}
+        connectors={[
+          {
+            id: "slack",
+            name: "Slack",
+            description: "Connect to Slack workspace",
+            logo: "https://slack.com/logo.png",
+          },
+          {
+            id: "trello",
+            name: "Trello",
+            description: "Connect to Trello board",
+            logo: "https://trello.com/logo.png",
+          },
+        ]}
+      />
+
+      <div>
+        <h3>Active Connections</h3>
+        {connections.map((connection) => (
+          <div key={connection.id}>
+            <span>{connection.connector.name}</span>
+            <button onClick={() => deleteConnection(connection.id)}>
+              Disconnect
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Custom Authentication Form
+
+```tsx
+import React, { useState } from "react";
+import { useConnect } from "@databite/connect";
+
+function CustomAuthForm() {
+  const [formData, setFormData] = useState({
+    apiKey: "",
+    baseUrl: "https://api.service.com",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const { createConnection } = useConnect();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      await createConnection("custom-service", formData);
+    } catch (error) {
+      console.error("Authentication failed:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div>
+        <label htmlFor="apiKey">API Key</label>
+        <input
+          id="apiKey"
+          type="password"
+          value={formData.apiKey}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, apiKey: e.target.value }))
+          }
+          required
+        />
+      </div>
+
+      <div>
+        <label htmlFor="baseUrl">Base URL</label>
+        <input
+          id="baseUrl"
+          type="url"
+          value={formData.baseUrl}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, baseUrl: e.target.value }))
+          }
+          required
+        />
+      </div>
+
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? "Connecting..." : "Connect"}
+      </button>
+    </form>
+  );
+}
+```
+
+## Flow Integration
+
+### FlowRenderer Component
+
+```tsx
+import React from "react";
+import { FlowRenderer, useFlowExecution } from "@databite/flow/react";
+import { FlowBuilder } from "@databite/flow";
+
+// Define a flow
+const userFlow = new FlowBuilder()
+  .form("user_form", {
+    title: "User Information",
+    description: "Please enter your details",
+    fields: [
+      {
+        name: "name",
+        type: "string",
+        label: "Full Name",
+        required: true,
+      },
+      {
+        name: "email",
+        type: "email",
+        label: "Email Address",
+        required: true,
+      },
+    ],
+    submitText: "Continue",
+    action: "process_user",
+  })
+  .http("process_user", {
+    method: "POST",
+    url: "https://api.service.com/users",
+    body: {
+      name: "{{form.name}}",
+      email: "{{form.email}}",
+    },
+  })
+  .transform("extract_user", {
+    id: "{{response.id}}",
+    name: "{{form.name}}",
+    email: "{{form.email}}",
+  })
+  .build();
+
+function UserFlowComponent() {
+  const { executeFlow, state, error } = useFlowExecution(userFlow);
+
+  const handleStart = () => {
+    executeFlow({
+      config: {
+        apiUrl: "https://api.service.com",
+      },
+    });
+  };
+
+  return (
+    <div>
+      <button onClick={handleStart}>Start User Flow</button>
+
+      <FlowRenderer flow={userFlow} state={state} onAction={executeFlow} />
+
+      {error && <div className="error">Error: {error.message}</div>}
+    </div>
+  );
+}
+```
+
+### Custom Flow Components
+
+```tsx
+import React from "react";
+import { FlowBlock, FlowState } from "@databite/flow";
+
+interface CustomFormBlockProps {
+  block: FlowBlock;
+  state: FlowState;
+  onAction: (action: string, data?: any) => void;
+}
+
+function CustomFormBlock({ block, state, onAction }: CustomFormBlockProps) {
+  const [formData, setFormData] = useState({});
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onAction(block.action, formData);
+  };
+
+  return (
+    <div className="custom-form-block">
+      <h3>{block.title}</h3>
+      <p>{block.description}</p>
+
+      <form onSubmit={handleSubmit}>
+        {block.fields?.map((field) => (
+          <div key={field.name}>
+            <label htmlFor={field.name}>{field.label}</label>
+            <input
+              id={field.name}
+              type={field.type}
+              value={formData[field.name] || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  [field.name]: e.target.value,
+                }))
+              }
+              required={field.required}
+              placeholder={field.placeholder}
+            />
+          </div>
+        ))}
+
+        <button type="submit">{block.submitText || "Submit"}</button>
+      </form>
+    </div>
+  );
+}
+
+// Register custom component
+FlowRenderer.registerComponent("custom_form", CustomFormBlock);
+```
+
+## Data Management
+
+### Data Fetching with Hooks
+
+```tsx
+import React from "react";
+import { useConnector, useSync } from "@databite/connect";
+
+function DataManagementExample() {
+  const { connector, isLoading, error } = useConnector("slack");
+  const { sync, syncStatus, syncData } = useSync("slack", "sync_messages");
+
+  const handleSync = async () => {
+    try {
+      await sync();
+    } catch (error) {
+      console.error("Sync failed:", error);
+    }
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div>
+      <h3>Slack Integration</h3>
+
+      <div>
+        <button onClick={handleSync} disabled={syncStatus === "running"}>
+          {syncStatus === "running" ? "Syncing..." : "Sync Messages"}
+        </button>
+
+        <div>Status: {syncStatus}</div>
+      </div>
+
+      {syncData && (
+        <div>
+          <h4>Synced Messages</h4>
+          <ul>
+            {syncData.map((message: any) => (
+              <li key={message.id}>
+                {message.text} - {message.user}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Real-time Data Updates
+
+```tsx
+import React, { useEffect, useState } from "react";
+import { useConnector, useWebSocket } from "@databite/connect";
+
+function RealTimeDataExample() {
+  const { connector } = useConnector("slack");
+  const [messages, setMessages] = useState([]);
+  const { subscribe, unsubscribe } = useWebSocket();
+
+  useEffect(() => {
+    if (!connector) return;
+
+    const handleMessage = (data: any) => {
+      setMessages((prev) => [...prev, data]);
+    };
+
+    subscribe("slack:messages", handleMessage);
+
+    return () => {
+      unsubscribe("slack:messages", handleMessage);
+    };
+  }, [connector, subscribe, unsubscribe]);
+
+  return (
+    <div>
+      <h3>Real-time Messages</h3>
+      <ul>
+        {messages.map((message: any) => (
+          <li key={message.id}>
+            {message.text} - {message.user}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+## Advanced Patterns
+
+### Custom Connector Hooks
+
+```tsx
+import { useState, useEffect } from "react";
+import { useConnector } from "@databite/connect";
+
+function useCustomConnector(connectorId: string) {
+  const { connector, isLoading, error } = useConnector(connectorId);
+  const [data, setData] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const refreshData = async () => {
+    if (!connector) return;
+
+    setIsRefreshing(true);
+    try {
+      const result = await connector.actions.get_data.execute({});
+      setData(result);
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (connector) {
+      refreshData();
+    }
+  }, [connector]);
+
+  return {
+    connector,
+    data,
+    isLoading,
+    isRefreshing,
+    error,
+    refreshData,
+  };
+}
+
+// Usage
+function CustomConnectorExample() {
+  const { data, refreshData, isRefreshing } =
+    useCustomConnector("custom-service");
+
+  return (
+    <div>
+      <button onClick={refreshData} disabled={isRefreshing}>
+        {isRefreshing ? "Refreshing..." : "Refresh Data"}
+      </button>
+
+      {data && (
+        <div>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Error Boundary
+
+```tsx
+import React, { Component, ErrorInfo, ReactNode } from "react";
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+class DatabiteErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Databite Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <div className="error-boundary">
+            <h2>Something went wrong</h2>
+            <p>{this.state.error?.message}</p>
+            <button onClick={() => this.setState({ hasError: false })}>
+              Try again
+            </button>
+          </div>
+        )
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Usage
+function App() {
+  return (
+    <DatabiteErrorBoundary>
+      <YourApp />
+    </DatabiteErrorBoundary>
+  );
+}
+```
+
+## Styling and Theming
+
+### Theme Provider
+
+```tsx
+import React from "react";
+import { ThemeProvider } from "@databite/connect";
+
+const customTheme = {
+  colors: {
+    primary: "#007bff",
+    secondary: "#6c757d",
+    success: "#28a745",
+    danger: "#dc3545",
+    warning: "#ffc107",
+    info: "#17a2b8",
+  },
+  fonts: {
+    primary: "Inter, sans-serif",
+    secondary: "Monaco, monospace",
+  },
+  spacing: {
+    xs: "4px",
+    sm: "8px",
+    md: "16px",
+    lg: "24px",
+    xl: "32px",
+  },
+};
+
+function ThemedApp() {
+  return (
+    <ThemeProvider theme={customTheme}>
+      <YourApp />
+    </ThemeProvider>
+  );
+}
+```
+
+### Custom Styling
+
+```tsx
+import React from "react";
+import { ConnectModal } from "@databite/connect";
+import "./CustomStyles.css";
+
+function CustomStyledModal() {
+  return (
+    <ConnectModal
+      isOpen={true}
+      onClose={() => {}}
+      onConnect={() => {}}
+      connectors={[]}
+      className="custom-connect-modal"
+      style={{
+        "--modal-background": "#f8f9fa",
+        "--modal-border": "1px solid #dee2e6",
+        "--modal-radius": "8px",
+      }}
+    />
+  );
+}
+```
+
+## Testing React Components
+
+### Component Testing
+
+```tsx
+import React from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { DatabiteProvider } from "@databite/connect";
+import { AuthExample } from "./AuthExample";
+
+const mockConnector = {
+  id: "test-connector",
+  name: "Test Connector",
+  description: "Test connector for testing",
+};
+
+function renderWithProviders(component: React.ReactElement) {
+  return render(
+    <DatabiteProvider
+      config={{
+        apiUrl: "https://test.api.com",
+        apiKey: "test-key",
+      }}
+    >
+      {component}
+    </DatabiteProvider>
+  );
+}
+
+describe("AuthExample", () => {
+  it("should render connect button", () => {
+    renderWithProviders(<AuthExample />);
+    expect(screen.getByText("Connect Service")).toBeInTheDocument();
+  });
+
+  it("should open modal when button is clicked", async () => {
+    renderWithProviders(<AuthExample />);
+
+    fireEvent.click(screen.getByText("Connect Service"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Connect to Service")).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### Hook Testing
+
+```tsx
+import { renderHook, act } from "@testing-library/react";
+import { useConnector } from "@databite/connect";
+
+describe("useConnector", () => {
+  it("should return connector data", async () => {
+    const { result } = renderHook(() => useConnector("test-connector"));
+
+    await act(async () => {
+      // Simulate connector loading
+    });
+
+    expect(result.current.connector).toBeDefined();
+    expect(result.current.isLoading).toBe(false);
+  });
+});
+```
+
+## Best Practices
+
+### Component Organization
+
+<Tip>
+  Organize your React components by feature and use custom hooks to encapsulate
+  connector logic.
+</Tip>
+
+```tsx
+// ✅ Good: Feature-based organization
+src / components / auth / ConnectModal.tsx;
+AuthForm.tsx;
+AuthProvider.tsx;
+data / DataTable.tsx;
+DataSync.tsx;
+DataProvider.tsx;
+flows / FlowRenderer.tsx;
+FlowProvider.tsx;
+CustomFlowBlock.tsx;
+
+// ✅ Good: Custom hooks for connector logic
+hooks / useConnector.ts;
+useSync.ts;
+useFlow.ts;
+useAuth.ts;
+```
+
+### Error Handling
+
+<Warning>
+  Always implement proper error handling in your React components to provide a
+  good user experience.
+</Warning>
+
+```tsx
+function RobustDataComponent() {
+  const { data, error, isLoading, retry } = useConnector("slack");
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="error">
+        <h3>Error loading data</h3>
+        <p>{error.message}</p>
+        <button onClick={retry}>Try again</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3>Data loaded successfully</h3>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+### Performance Optimization
+
+```tsx
+import React, { memo, useMemo, useCallback } from "react";
+
+const DataTable = memo(({ data, onRowClick }: DataTableProps) => {
+  const processedData = useMemo(() => {
+    return data.map((item) => ({
+      ...item,
+      processed: true,
+    }));
+  }, [data]);
+
+  const handleRowClick = useCallback(
+    (id: string) => {
+      onRowClick(id);
+    },
+    [onRowClick]
+  );
+
+  return (
+    <table>
+      <tbody>
+        {processedData.map((item) => (
+          <tr key={item.id} onClick={() => handleRowClick(item.id)}>
+            <td>{item.name}</td>
+            <td>{item.email}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+});
+```
+
+## Common Issues and Solutions
+
+### Issue: Stale Data
+
+<Note>
+  Use proper dependency arrays in useEffect and consider using refs for values
+  that don't need to trigger re-renders.
+</Note>
+
+```tsx
+// ❌ Bad: Missing dependencies
+useEffect(() => {
+  fetchData(connectorId);
+}, []); // Missing connectorId dependency
+
+// ✅ Good: Proper dependencies
+useEffect(() => {
+  fetchData(connectorId);
+}, [connectorId]);
+```
+
+### Issue: Memory Leaks
+
+```tsx
+// ❌ Bad: No cleanup
+useEffect(() => {
+  const subscription = subscribe("data", handleData);
+}, []);
+
+// ✅ Good: Proper cleanup
+useEffect(() => {
+  const subscription = subscribe("data", handleData);
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, []);
+```
+
+## Next Steps
+
+Now that you understand React integration, you can:
+
+1. **Build Complex UIs**: Create sophisticated user interfaces for your connectors
+2. **Implement Real-time Features**: Add real-time data updates and notifications
+3. **Optimize Performance**: Improve component performance and user experience
+4. **Add Testing**: Implement comprehensive testing for your React components
+
+Continue to the [Flow Workflows Guide](/guides/flow-workflows) to learn how to create complex user workflows.

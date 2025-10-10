@@ -1,0 +1,472 @@
+---
+title: "Your First Connector"
+description: "Learn how to build your first connector with the Databite SDK"
+---
+
+## Overview
+
+This guide will walk you through creating your first connector using the Databite SDK. We'll build a simple connector for a hypothetical API service that demonstrates the core concepts and patterns.
+
+## Prerequisites
+
+Before starting, make sure you have:
+
+- Node.js >= 16.0.0 installed
+- Basic knowledge of TypeScript
+- Understanding of REST APIs
+
+## Step 1: Installation
+
+First, install the required packages:
+
+```bash
+npm install @databite/build @databite/flow @databite/types zod
+```
+
+## Step 2: Define Configuration Schemas
+
+Start by defining the configuration schemas for your connector:
+
+```typescript
+import { z } from "zod";
+
+// Integration configuration - set when creating an integration
+const integrationConfig = z.object({
+  apiKey: z.string().min(1, "API key is required"),
+  baseUrl: z.string().url("Must be a valid URL"),
+  timeout: z.number().min(1000).max(60000).default(30000),
+});
+
+// Connection configuration - set during authentication
+const connectionConfig = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string().optional(),
+  userId: z.string(),
+});
+```
+
+## Step 3: Create Authentication Flow
+
+Create an authentication flow using the Flow engine:
+
+```typescript
+import { createFlow } from "@databite/flow";
+
+const authFlow = createFlow("authenticate")
+  .form("getCredentials", {
+    title: "API Authentication",
+    description: "Enter your API credentials to connect",
+    fields: [
+      {
+        name: "apiKey",
+        label: "API Key",
+        type: "password",
+        required: true,
+        placeholder: "Enter your API key",
+      },
+      {
+        name: "baseUrl",
+        label: "Base URL",
+        type: "url",
+        required: true,
+        placeholder: "https://api.example.com",
+      },
+    ],
+  })
+  .http("validateCredentials", {
+    url: (input) => `${input.getCredentials.baseUrl}/auth/validate`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.getCredentials.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    returnType: {
+      accessToken: "",
+      refreshToken: "",
+      userId: "",
+    },
+  })
+  .display("showSuccess", {
+    title: "Authentication Successful!",
+    content: "Your credentials have been validated and you're now connected.",
+  })
+  .returns((context) => ({
+    accessToken: context.validateCredentials.accessToken,
+    refreshToken: context.validateCredentials.refreshToken,
+    userId: context.validateCredentials.userId,
+  }));
+```
+
+## Step 4: Create Actions
+
+Define the actions your connector will support:
+
+```typescript
+import { createAction } from "@databite/build";
+
+const getUserAction = createAction({
+  label: "Get User",
+  description: "Fetch user information by ID",
+  inputSchema: z.object({
+    id: z.string().min(1, "User ID is required"),
+  }),
+  outputSchema: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    createdAt: z.string(),
+  }),
+  maxRetries: 3,
+  timeout: 30000,
+  handler: async (params, connection) => {
+    const response = await fetch(
+      `${connection.config.baseUrl}/users/${params.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${connection.config.accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(
+          "Authentication failed. Please check your credentials."
+        );
+      }
+      if (response.status === 404) {
+        throw new Error("User not found.");
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  },
+});
+
+const createUserAction = createAction({
+  label: "Create User",
+  description: "Create a new user",
+  inputSchema: z.object({
+    name: z.string().min(1, "Name is required"),
+    email: z.string().email("Must be a valid email"),
+  }),
+  outputSchema: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    createdAt: z.string(),
+  }),
+  maxRetries: 3,
+  timeout: 30000,
+  handler: async (params, connection) => {
+    const response = await fetch(`${connection.config.baseUrl}/users`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${connection.config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(
+          "Authentication failed. Please check your credentials."
+        );
+      }
+      if (response.status === 409) {
+        throw new Error("User with this email already exists.");
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  },
+});
+```
+
+## Step 5: Create Syncs
+
+Define data synchronization operations:
+
+```typescript
+import { createSync } from "@databite/build";
+
+const syncUsers = createSync({
+  label: "Sync Users",
+  description: "Synchronize all users from the API",
+  schedule: "0 2 * * *", // Daily at 2 AM
+  outputSchema: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      createdAt: z.string(),
+    })
+  ),
+  maxRetries: 3,
+  timeout: 60000,
+  handler: async (connection) => {
+    const response = await fetch(`${connection.config.baseUrl}/users`, {
+      headers: {
+        Authorization: `Bearer ${connection.config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.users || [];
+  },
+});
+```
+
+## Step 6: Build the Connector
+
+Now put it all together to create your connector:
+
+```typescript
+import { createConnector } from "@databite/build";
+
+const myConnector = createConnector()
+  .withIdentity("my-service", "My Service")
+  .withVersion("1.0.0")
+  .withAuthor("Your Name")
+  .withLogo("https://example.com/logo.png")
+  .withDescription("Connector for My Service API")
+  .withDocumentationUrl("https://docs.example.com")
+  .withIntegrationConfig(integrationConfig)
+  .withConnectionConfig(connectionConfig)
+  .withAuthenticationFlow(authFlow)
+  .withActions({
+    getUser: getUserAction,
+    createUser: createUserAction,
+  })
+  .withSyncs({
+    syncUsers: syncUsers,
+  })
+  .withTags("api", "users", "saas")
+  .withCategories("productivity")
+  .build();
+```
+
+## Step 7: Test Your Connector
+
+Create a simple test to verify your connector works:
+
+```typescript
+// Test integration creation
+const integration = myConnector.createIntegration("Test Integration", {
+  apiKey: "test-api-key",
+  baseUrl: "https://api.example.com",
+  timeout: 30000,
+});
+
+console.log("Integration created:", integration);
+
+// Test action execution (you'll need a real connection for this)
+const connection = {
+  id: "conn-1",
+  integrationId: integration.id,
+  config: {
+    accessToken: "test-access-token",
+    userId: "user-123",
+  },
+  status: "active",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+try {
+  const result = await myConnector.actions.getUser.handler(
+    { id: "user-123" },
+    connection
+  );
+  console.log("User fetched:", result);
+} catch (error) {
+  console.error("Error fetching user:", error.message);
+}
+```
+
+## Step 8: Use in a React Application
+
+If you're building a React application, you can use the Connect components:
+
+```tsx
+import { ConnectModal } from "@databite/connect";
+import { useState } from "react";
+
+function MyApp() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div>
+      <button onClick={() => setIsOpen(true)}>Connect to My Service</button>
+
+      <ConnectModal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        integration={integration}
+        onAuthSuccess={(integration, config) => {
+          console.log("Connected successfully:", config);
+          // Save connection to your backend
+        }}
+        onAuthError={(error) => {
+          console.error("Connection failed:", error);
+          // Show error message to user
+        }}
+      />
+    </div>
+  );
+}
+```
+
+## Best Practices
+
+### 1. Error Handling
+
+Always provide meaningful error messages:
+
+```typescript
+handler: async (params, connection) => {
+  try {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      switch (response.status) {
+        case 401:
+          throw new Error(
+            "Authentication failed. Please check your credentials."
+          );
+        case 403:
+          throw new Error(
+            "Access denied. You don't have permission to perform this action."
+          );
+        case 404:
+          throw new Error("Resource not found.");
+        case 429:
+          throw new Error("Rate limit exceeded. Please try again later.");
+        default:
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Network error. Please check your connection.");
+    }
+    throw error;
+  }
+};
+```
+
+### 2. Input Validation
+
+Use Zod schemas for robust input validation:
+
+```typescript
+const inputSchema = z.object({
+  email: z.string().email("Must be a valid email address"),
+  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
+  age: z
+    .number()
+    .min(0, "Age must be positive")
+    .max(150, "Age must be realistic"),
+});
+```
+
+### 3. Timeout Configuration
+
+Set appropriate timeouts for different operations:
+
+```typescript
+// Quick operations
+const quickAction = createAction({
+  timeout: 10000, // 10 seconds
+  // ...
+});
+
+// Data-intensive operations
+const dataSync = createSync({
+  timeout: 300000, // 5 minutes
+  // ...
+});
+```
+
+### 4. Retry Logic
+
+Configure retry logic based on the operation type:
+
+```typescript
+const action = createAction({
+  maxRetries: 3, // Retry up to 3 times
+  // ...
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Authentication Flows"
+    icon="key"
+    href="/guides/authentication-flows"
+  >
+    Learn about different authentication patterns and flows
+  </Card>
+  <Card
+    title="Data Synchronization"
+    icon="arrows-rotate"
+    href="/guides/data-synchronization"
+  >
+    Set up automated data synchronization
+  </Card>
+  <Card
+    title="Custom Connectors"
+    icon="wrench"
+    href="/guides/custom-connectors"
+  >
+    Build more complex connectors with advanced features
+  </Card>
+  <Card
+    title="Testing Connectors"
+    icon="flask"
+    href="/guides/testing-connectors"
+  >
+    Learn how to test your connectors effectively
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="TypeScript Errors">
+    Make sure you have the correct types imported and your schemas are properly
+    defined.
+  </Accordion>
+  <Accordion title="Authentication Failures">
+    Check that your authentication flow is correctly configured and your API
+    credentials are valid.
+  </Accordion>
+  <Accordion title="Action Execution Errors">
+    Verify that your action handlers are properly implemented and handle errors
+    gracefully.
+  </Accordion>
+</AccordionGroup>
+
+### Getting Help
+
+If you run into issues:
+
+1. Check the [Common Issues guide](/guides/common-issues)
+2. Review the [Debugging guide](/guides/debugging)
+3. Join our [Discord community](https://discord.gg/databite)
+4. Open an issue on [GitHub](https://github.com/databite/databite/issues)

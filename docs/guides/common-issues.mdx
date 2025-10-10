@@ -1,0 +1,684 @@
+---
+title: "Common Issues"
+description: "Troubleshoot common issues and problems when working with Databite connectors and flows"
+---
+
+import { Steps, Card, Note, Warning, Tip } from "@mintlify/components";
+
+# Common Issues
+
+This guide helps you troubleshoot common issues when working with Databite connectors, flows, and integrations. Each issue includes symptoms, causes, and solutions.
+
+## Authentication Issues
+
+### Issue: Invalid API Key
+
+**Symptoms:**
+
+- Authentication fails with 401 Unauthorized
+- "Invalid API key" error messages
+- Connector cannot connect to service
+
+**Causes:**
+
+- Incorrect API key format
+- Expired or revoked API key
+- Missing or incorrect API key configuration
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Validate API key format
+const validateApiKey = (apiKey: string) => {
+  if (!apiKey || apiKey.length < 10) {
+    throw new Error("API key must be at least 10 characters long");
+  }
+  return true;
+};
+
+// ✅ Good: Handle API key errors gracefully
+const handleApiKeyError = (error: any) => {
+  if (error.status === 401) {
+    throw new Error("Invalid API key. Please check your credentials.");
+  }
+  throw error;
+};
+```
+
+### Issue: OAuth Token Expiration
+
+**Symptoms:**
+
+- Authentication works initially but fails after some time
+- "Token expired" error messages
+- Intermittent authentication failures
+
+**Causes:**
+
+- OAuth tokens have expiration times
+- No token refresh mechanism implemented
+- Stored tokens are outdated
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Implement token refresh
+const refreshToken = async (refreshToken: string) => {
+  try {
+    const response = await fetch("https://api.service.com/oauth/token", {
+      method: "POST",
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Token refresh failed");
+    }
+
+    return response.json();
+  } catch (error) {
+    throw new Error("Failed to refresh token. Please re-authenticate.");
+  }
+};
+
+// ✅ Good: Check token expiration before API calls
+const checkTokenExpiration = (token: any) => {
+  if (token.expires_at && Date.now() > token.expires_at) {
+    return refreshToken(token.refresh_token);
+  }
+  return Promise.resolve(token);
+};
+```
+
+## Data Synchronization Issues
+
+### Issue: Sync Fails with Large Datasets
+
+**Symptoms:**
+
+- Sync process times out
+- Memory usage spikes during sync
+- Incomplete data synchronization
+
+**Causes:**
+
+- Loading entire dataset into memory
+- No pagination or batching
+- Insufficient timeout settings
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Implement pagination
+const syncWithPagination = async (
+  endpoint: string,
+  pageSize: number = 1000
+) => {
+  let page = 1;
+  let hasMore = true;
+  const results = [];
+
+  while (hasMore) {
+    const response = await fetch(`${endpoint}?page=${page}&limit=${pageSize}`);
+    const data = await response.json();
+
+    results.push(...data.items);
+    hasMore = data.has_more;
+    page++;
+  }
+
+  return results;
+};
+
+// ✅ Good: Use streaming for large datasets
+const streamSync = async (endpoint: string) => {
+  const response = await fetch(endpoint);
+  const reader = response.body?.getReader();
+
+  if (!reader) {
+    throw new Error("Streaming not supported");
+  }
+
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+
+  return chunks;
+};
+```
+
+### Issue: Duplicate Data in Sync
+
+**Symptoms:**
+
+- Same records appear multiple times
+- Data inconsistency between source and destination
+- Sync process creates duplicates
+
+**Causes:**
+
+- No unique key constraints
+- Incorrect upsert logic
+- Race conditions in concurrent syncs
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Use unique keys for upserts
+const syncWithUpsert = {
+  id: "sync_with_upsert",
+  name: "Sync with Upsert",
+  source: {
+    type: "api",
+    url: "https://api.service.com/data",
+  },
+  destination: {
+    type: "database",
+    table: "data",
+    mode: "upsert",
+    key: "id", // Use unique key for upserts
+  },
+  transform: {
+    id: "{{item.id}}",
+    name: "{{item.name}}",
+    email: "{{item.email}}",
+    updated_at: "{{item.updated_at}}",
+  },
+};
+
+// ✅ Good: Implement deduplication
+const deduplicateData = (data: any[], key: string) => {
+  const seen = new Set();
+  return data.filter((item) => {
+    if (seen.has(item[key])) {
+      return false;
+    }
+    seen.add(item[key]);
+    return true;
+  });
+};
+```
+
+## Flow Execution Issues
+
+### Issue: Flow Stuck in Loading State
+
+**Symptoms:**
+
+- Flow shows loading spinner indefinitely
+- No error messages displayed
+- User cannot proceed with flow
+
+**Causes:**
+
+- API calls timing out
+- Missing error handling
+- Infinite loops in flow logic
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Add timeout to API calls
+const flowWithTimeout = new FlowBuilder()
+  .http("api_call", {
+    method: "GET",
+    url: "https://api.service.com/data",
+    timeout: 30000, // 30 seconds
+    onError: "handle_timeout",
+  })
+  .generic("handle_timeout", {
+    title: "Request Timeout",
+    description: "The request took too long to complete. Please try again.",
+    buttonText: "Retry",
+    action: "api_call",
+  })
+  .build();
+
+// ✅ Good: Implement proper error handling
+const robustFlow = new FlowBuilder()
+  .generic("start", {
+    title: "Start Process",
+    action: "api_call",
+  })
+  .http("api_call", {
+    method: "GET",
+    url: "https://api.service.com/data",
+    onError: "handle_error",
+  })
+  .generic("handle_error", {
+    title: "Error Occurred",
+    description: "An error occurred. Please try again or contact support.",
+    buttonText: "Retry",
+    action: "api_call",
+  })
+  .build();
+```
+
+### Issue: Flow State Not Persisting
+
+**Symptoms:**
+
+- Form data lost on page refresh
+- Flow resets to beginning
+- User progress not saved
+
+**Causes:**
+
+- No state persistence mechanism
+- State stored only in memory
+- Browser refresh clears state
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Persist flow state
+const persistFlowState = (flowId: string, state: any) => {
+  localStorage.setItem(`flow_${flowId}`, JSON.stringify(state));
+};
+
+const restoreFlowState = (flowId: string) => {
+  const stored = localStorage.getItem(`flow_${flowId}`);
+  return stored ? JSON.parse(stored) : null;
+};
+
+// ✅ Good: Use flow state persistence
+const persistentFlow = new FlowBuilder()
+  .generic("start", {
+    title: "Start Process",
+    action: "collect_data",
+  })
+  .form("collect_data", {
+    title: "Collect Data",
+    fields: [
+      {
+        name: "data",
+        type: "string",
+        label: "Data",
+        required: true,
+      },
+    ],
+    submitText: "Next",
+    action: "process_data",
+  })
+  .http("process_data", {
+    method: "POST",
+    url: "https://api.service.com/process",
+    body: {
+      data: "{{form.data}}",
+    },
+  })
+  .build();
+```
+
+## Performance Issues
+
+### Issue: Slow Connector Performance
+
+**Symptoms:**
+
+- Actions take long time to execute
+- High memory usage
+- Timeout errors
+
+**Causes:**
+
+- Inefficient API calls
+- No caching mechanism
+- Synchronous operations blocking execution
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Implement caching
+const cachedConnector = new ConnectorBuilder()
+  .identity({
+    id: "cached-connector",
+    name: "Cached Connector",
+  })
+  .actions([
+    {
+      id: "get_data",
+      name: "Get Data",
+      description: "Get data with caching",
+      inputs: {},
+      execute: async (inputs, context) => {
+        const cacheKey = `data_${JSON.stringify(inputs)}`;
+        const cached = await context.cache.get(cacheKey);
+
+        if (cached) {
+          return cached;
+        }
+
+        const response = await fetch("https://api.service.com/data");
+        const data = await response.json();
+
+        await context.cache.set(cacheKey, data, 300); // Cache for 5 minutes
+
+        return data;
+      },
+    },
+  ])
+  .build();
+
+// ✅ Good: Use async/await properly
+const asyncConnector = new ConnectorBuilder()
+  .actions([
+    {
+      id: "async_action",
+      name: "Async Action",
+      description: "Async action with proper error handling",
+      inputs: {},
+      execute: async (inputs, context) => {
+        try {
+          const [data1, data2] = await Promise.all([
+            fetch("https://api.service.com/data1").then((r) => r.json()),
+            fetch("https://api.service.com/data2").then((r) => r.json()),
+          ]);
+
+          return { data1, data2 };
+        } catch (error) {
+          throw new Error(`Failed to fetch data: ${error.message}`);
+        }
+      },
+    },
+  ])
+  .build();
+```
+
+### Issue: Memory Leaks
+
+**Symptoms:**
+
+- Memory usage increases over time
+- Application becomes slow
+- Browser crashes
+
+**Causes:**
+
+- Event listeners not removed
+- Timers not cleared
+- Large objects not garbage collected
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Clean up event listeners
+class ConnectorComponent extends React.Component {
+  componentDidMount() {
+    this.subscription = subscribe("data", this.handleData);
+  }
+
+  componentWillUnmount() {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
+  }
+
+  handleData = (data: any) => {
+    // Handle data
+  };
+}
+
+// ✅ Good: Clear timers
+class TimerComponent extends React.Component {
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      // Do something
+    }, 1000);
+  }
+
+  componentWillUnmount() {
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+  }
+}
+```
+
+## Configuration Issues
+
+### Issue: Missing Environment Variables
+
+**Symptoms:**
+
+- "Environment variable not found" errors
+- Connector fails to initialize
+- Configuration validation fails
+
+**Causes:**
+
+- Environment variables not set
+- Incorrect variable names
+- Missing .env file
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Validate environment variables
+const validateEnv = () => {
+  const required = ["API_URL", "API_KEY"];
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`
+    );
+  }
+};
+
+// ✅ Good: Use default values
+const config = {
+  apiUrl: process.env.API_URL || "https://api.service.com",
+  apiKey: process.env.API_KEY || "",
+  timeout: parseInt(process.env.TIMEOUT || "30000"),
+};
+```
+
+### Issue: Incorrect Configuration Schema
+
+**Symptoms:**
+
+- Configuration validation fails
+- Connector cannot be created
+- "Invalid configuration" errors
+
+**Causes:**
+
+- Wrong data types in configuration
+- Missing required fields
+- Invalid configuration values
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Use Zod for configuration validation
+import { z } from "zod";
+
+const configSchema = z.object({
+  apiUrl: z.string().url(),
+  apiKey: z.string().min(10),
+  timeout: z.number().min(1000).max(300000),
+  retries: z.number().min(0).max(10),
+});
+
+const validateConfig = (config: any) => {
+  try {
+    return configSchema.parse(config);
+  } catch (error) {
+    throw new Error(`Invalid configuration: ${error.message}`);
+  }
+};
+```
+
+## Testing Issues
+
+### Issue: Flaky Tests
+
+**Symptoms:**
+
+- Tests pass and fail randomly
+- Inconsistent test results
+- Tests depend on external services
+
+**Causes:**
+
+- Timing issues in tests
+- External API dependencies
+- Shared state between tests
+
+**Solutions:**
+
+```typescript
+// ✅ Good: Mock external dependencies
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
+
+describe("Connector Tests", () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it("should handle API calls", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: "test" }),
+    });
+
+    const result = await connector.actions.get_data.execute({});
+    expect(result.data).toBe("test");
+  });
+});
+
+// ✅ Good: Use proper test isolation
+describe("Isolated Tests", () => {
+  let connector: any;
+
+  beforeEach(() => {
+    connector = createTestConnector();
+  });
+
+  afterEach(() => {
+    cleanupTestConnector(connector);
+  });
+
+  it("should not affect other tests", async () => {
+    // Test implementation
+  });
+});
+```
+
+## Debugging Tips
+
+### Enable Debug Logging
+
+```typescript
+// ✅ Good: Enable debug logging
+const debugConnector = new ConnectorBuilder()
+  .identity({
+    id: "debug-connector",
+    name: "Debug Connector",
+  })
+  .configuration({
+    debug: {
+      type: "boolean",
+      label: "Enable Debug Logging",
+      default: false,
+    },
+  })
+  .actions([
+    {
+      id: "debug_action",
+      name: "Debug Action",
+      description: "Action with debug logging",
+      inputs: {},
+      execute: async (inputs, context) => {
+        if (context.config.debug) {
+          console.log("Debug: Action inputs", inputs);
+          console.log("Debug: Action context", context);
+        }
+
+        const result = await fetch("https://api.service.com/data");
+
+        if (context.config.debug) {
+          console.log("Debug: API response", result);
+        }
+
+        return result.json();
+      },
+    },
+  ])
+  .build();
+```
+
+### Use Error Boundaries
+
+```tsx
+// ✅ Good: Implement error boundaries
+class ConnectorErrorBoundary extends React.Component {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Connector Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong</h2>
+          <p>{this.state.error?.message}</p>
+          <button onClick={() => this.setState({ hasError: false })}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+## Getting Help
+
+### Check Documentation
+
+1. **Package READMEs**: Check individual package documentation
+2. **API Reference**: Review API documentation for correct usage
+3. **Examples**: Look at example implementations
+
+### Debug Steps
+
+1. **Enable Debug Logging**: Turn on debug mode to see detailed logs
+2. **Check Network Tab**: Inspect API calls in browser dev tools
+3. **Validate Configuration**: Ensure all required fields are provided
+4. **Test in Isolation**: Create minimal test cases to isolate issues
+
+### Community Support
+
+- **GitHub Issues**: Report bugs and ask questions
+- **Discord**: Join the community for real-time help
+- **Stack Overflow**: Search for existing solutions
+
+## Next Steps
+
+Now that you understand common issues, you can:
+
+1. **Implement Monitoring**: Set up monitoring to catch issues early
+2. **Add Logging**: Implement comprehensive logging for debugging
+3. **Create Tests**: Write tests to prevent regressions
+4. **Document Solutions**: Keep track of solutions for future reference
+
+Continue to the [Debugging Guide](/guides/debugging) to learn advanced debugging techniques.

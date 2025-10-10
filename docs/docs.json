@@ -1,0 +1,123 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Databite SDK",
+  "colors": {
+    "primary": "#ff6900",
+    "light": "#ff6900",
+    "dark": "#ff6900"
+  },
+  "favicon": "/images/logo.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["index", "quickstart", "installation"]
+          },
+          {
+            "group": "Core Packages",
+            "pages": ["packages/types", "packages/build", "packages/flow"]
+          },
+          {
+            "group": "Integration Packages",
+            "pages": [
+              "packages/connectors",
+              "packages/connect",
+              "packages/engine",
+              "packages/ai"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": ["examples/webapp"]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "guides/your-first-connector",
+              "guides/authentication-flows",
+              "guides/data-synchronization"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "guides/custom-connectors",
+              "guides/error-handling",
+              "guides/testing-connectors",
+              "guides/ai-connector-generation",
+              "guides/react-integration",
+              "guides/flow-workflows"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "guides/common-issues",
+              "guides/debugging",
+              "guides/performance-optimization"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/databite/databite",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.gg/databite",
+          "icon": "discord"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/images/logo.svg",
+    "dark": "/images/logo.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@databite.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://databite.com/sign-up"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/databite",
+      "github": "https://github.com/databite",
+      "linkedin": "https://www.linkedin.com/company/databite"
+    }
+  }
+}

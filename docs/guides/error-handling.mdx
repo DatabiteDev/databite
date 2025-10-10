@@ -1,0 +1,814 @@
+---
+title: "Error Handling"
+description: "Learn how to implement robust error handling in your Databite connectors and flows"
+---
+
+import { Steps, Card, Note, Warning, Tip } from "@mintlify/components";
+
+# Error Handling
+
+Error handling is crucial for building reliable data integrations. This guide shows you how to implement comprehensive error handling strategies in your Databite connectors, flows, and sync operations.
+
+## Overview
+
+Effective error handling in Databite involves:
+
+- **Graceful degradation** when services are unavailable
+- **Retry mechanisms** for transient failures
+- **User-friendly error messages** for better UX
+- **Logging and monitoring** for debugging
+- **Circuit breakers** to prevent cascade failures
+
+## Basic Error Handling
+
+### Try-Catch Blocks
+
+```typescript
+import { ConnectorBuilder } from "@databite/build";
+
+const connector = new ConnectorBuilder()
+  .identity({
+    id: "error-handling-example",
+    name: "Error Handling Example",
+  })
+  .actions([
+    {
+      id: "safe_api_call",
+      name: "Safe API Call",
+      description: "Make API call with error handling",
+      inputs: {
+        endpoint: {
+          type: "string",
+          label: "Endpoint",
+          required: true,
+        },
+      },
+      execute: async (inputs, context) => {
+        try {
+          const response = await fetch(
+            `${context.config.base_url}${inputs.endpoint}`,
+            {
+              headers: {
+                Authorization: `Bearer ${context.tokens.api_key}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          return await response.json();
+        } catch (error) {
+          // Log error for debugging
+          console.error("API call failed:", error);
+
+          // Return structured error response
+          return {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          };
+        }
+      },
+    },
+  ])
+  .build();
+```
+
+### Error Types and Classification
+
+```typescript
+enum ErrorType {
+  NETWORK_ERROR = "NETWORK_ERROR",
+  AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR",
+  VALIDATION_ERROR = "VALIDATION_ERROR",
+  RATE_LIMIT_ERROR = "RATE_LIMIT_ERROR",
+  SERVER_ERROR = "SERVER_ERROR",
+  UNKNOWN_ERROR = "UNKNOWN_ERROR",
+}
+
+class DatabiteError extends Error {
+  constructor(
+    message: string,
+    public type: ErrorType,
+    public statusCode?: number,
+    public retryable: boolean = false
+  ) {
+    super(message);
+    this.name = "DatabiteError";
+  }
+}
+
+function classifyError(error: any): DatabiteError {
+  if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
+    return new DatabiteError(
+      "Network connection failed",
+      ErrorType.NETWORK_ERROR,
+      undefined,
+      true
+    );
+  }
+
+  if (error.status === 401) {
+    return new DatabiteError(
+      "Authentication failed",
+      ErrorType.AUTHENTICATION_ERROR,
+      401,
+      false
+    );
+  }
+
+  if (error.status === 429) {
+    return new DatabiteError(
+      "Rate limit exceeded",
+      ErrorType.RATE_LIMIT_ERROR,
+      429,
+      true
+    );
+  }
+
+  if (error.status >= 500) {
+    return new DatabiteError(
+      "Server error",
+      ErrorType.SERVER_ERROR,
+      error.status,
+      true
+    );
+  }
+
+  return new DatabiteError(
+    "Unknown error occurred",
+    ErrorType.UNKNOWN_ERROR,
+    undefined,
+    false
+  );
+}
+```
+
+## Retry Mechanisms
+
+### Exponential Backoff
+
+```typescript
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt);
+      const jitter = Math.random() * 1000; // Add jitter to prevent thundering herd
+
+      await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+    }
+  }
+
+  throw lastError!;
+}
+
+// Usage in connector
+const retryConnector = new ConnectorBuilder()
+  .identity({
+    id: "retry-example",
+    name: "Retry Example",
+  })
+  .actions([
+    {
+      id: "retry_api_call",
+      name: "Retry API Call",
+      description: "Make API call with retry logic",
+      inputs: {
+        endpoint: {
+          type: "string",
+          label: "Endpoint",
+          required: true,
+        },
+      },
+      execute: async (inputs, context) => {
+        return retryWithBackoff(
+          async () => {
+            const response = await fetch(
+              `${context.config.base_url}${inputs.endpoint}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${context.tokens.api_key}`,
+                },
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
+            }
+
+            return response.json();
+          },
+          3,
+          1000
+        );
+      },
+    },
+  ])
+  .build();
+```
+
+### Circuit Breaker Pattern
+
+```typescript
+class CircuitBreaker {
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  private state: "CLOSED" | "OPEN" | "HALF_OPEN" = "CLOSED";
+
+  constructor(
+    private failureThreshold: number = 5,
+    private timeout: number = 60000 // 1 minute
+  ) {}
+
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === "OPEN") {
+      if (Date.now() - this.lastFailureTime > this.timeout) {
+        this.state = "HALF_OPEN";
+      } else {
+        throw new Error("Circuit breaker is OPEN");
+      }
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private onSuccess() {
+    this.failureCount = 0;
+    this.state = "CLOSED";
+  }
+
+  private onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = "OPEN";
+    }
+  }
+}
+
+// Usage
+const circuitBreaker = new CircuitBreaker(5, 60000);
+
+const circuitBreakerConnector = new ConnectorBuilder()
+  .identity({
+    id: "circuit-breaker-example",
+    name: "Circuit Breaker Example",
+  })
+  .actions([
+    {
+      id: "circuit_breaker_call",
+      name: "Circuit Breaker Call",
+      description: "Make API call with circuit breaker",
+      inputs: {
+        endpoint: {
+          type: "string",
+          label: "Endpoint",
+          required: true,
+        },
+      },
+      execute: async (inputs, context) => {
+        return circuitBreaker.execute(async () => {
+          const response = await fetch(
+            `${context.config.base_url}${inputs.endpoint}`,
+            {
+              headers: {
+                Authorization: `Bearer ${context.tokens.api_key}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          return response.json();
+        });
+      },
+    },
+  ])
+  .build();
+```
+
+## Flow Error Handling
+
+### Error Handling in Flows
+
+```typescript
+import { FlowBuilder } from "@databite/flow";
+
+const errorHandlingFlow = new FlowBuilder()
+  .generic("start", {
+    title: "Start Process",
+    description: "Click to start the process",
+    buttonText: "Start",
+    action: "api_call",
+  })
+  .http("api_call", {
+    method: "GET",
+    url: "https://api.service.com/data",
+    headers: {
+      Authorization: "Bearer {{tokens.api_key}}",
+    },
+    onError: "handle_api_error",
+  })
+  .generic("handle_api_error", {
+    title: "API Error",
+    description: "The API call failed. Would you like to retry?",
+    buttonText: "Retry",
+    action: "api_call",
+  })
+  .transform("process_data", {
+    result: "{{response.data}}",
+    processed_at: "{{now}}",
+  })
+  .build();
+```
+
+### Conditional Error Handling
+
+```typescript
+const conditionalErrorFlow = new FlowBuilder()
+  .generic("start", {
+    title: "Start Process",
+    description: "Click to start the process",
+    buttonText: "Start",
+    action: "api_call",
+  })
+  .http("api_call", {
+    method: "GET",
+    url: "https://api.service.com/data",
+    headers: {
+      Authorization: "Bearer {{tokens.api_key}}",
+    },
+    onError: "check_error_type",
+  })
+  .generic("check_error_type", {
+    title: "Error Occurred",
+    description: "An error occurred. Checking error type...",
+    buttonText: "Continue",
+    action: "handle_network_error",
+  })
+  .generic("handle_network_error", {
+    title: "Network Error",
+    description:
+      "Network connection failed. Please check your internet connection and try again.",
+    buttonText: "Retry",
+    action: "api_call",
+  })
+  .generic("handle_auth_error", {
+    title: "Authentication Error",
+    description: "Authentication failed. Please check your credentials.",
+    buttonText: "Re-authenticate",
+    action: "re_auth",
+  })
+  .build();
+```
+
+## Data Sync Error Handling
+
+### Sync Error Recovery
+
+```typescript
+const errorRecoverySync = {
+  id: "error_recovery_sync",
+  name: "Error Recovery Sync",
+  description: "Sync with error recovery",
+  source: {
+    type: "api",
+    url: "https://api.service.com/data",
+    headers: {
+      Authorization: "Bearer {{tokens.api_key}}",
+    },
+    retry: {
+      attempts: 3,
+      delay: 5000,
+      backoff: "exponential",
+    },
+  },
+  destination: {
+    type: "database",
+    table: "data",
+    onError: "log_and_continue",
+  },
+  errorHandling: {
+    strategy: "retry_with_backoff",
+    maxRetries: 3,
+    retryDelay: 5000,
+    onFailure: "notify_admin",
+  },
+};
+```
+
+### Partial Success Handling
+
+```typescript
+const partialSuccessSync = {
+  id: "partial_success_sync",
+  name: "Partial Success Sync",
+  description: "Sync with partial success handling",
+  source: {
+    type: "api",
+    url: "https://api.service.com/batch_data",
+    batchSize: 100,
+  },
+  destination: {
+    type: "database",
+    table: "batch_data",
+    mode: "batch_insert",
+  },
+  errorHandling: {
+    strategy: "partial_success",
+    onItemError: "log_and_continue",
+    onBatchError: "retry_batch",
+  },
+};
+```
+
+## User-Friendly Error Messages
+
+### Error Message Localization
+
+```typescript
+const errorMessages = {
+  en: {
+    NETWORK_ERROR:
+      "Network connection failed. Please check your internet connection.",
+    AUTHENTICATION_ERROR:
+      "Authentication failed. Please check your credentials.",
+    RATE_LIMIT_ERROR: "Rate limit exceeded. Please try again later.",
+    SERVER_ERROR: "Server error occurred. Please try again later.",
+    VALIDATION_ERROR: "Invalid input. Please check your data and try again.",
+  },
+  es: {
+    NETWORK_ERROR:
+      "Falló la conexión de red. Por favor verifica tu conexión a internet.",
+    AUTHENTICATION_ERROR:
+      "Falló la autenticación. Por favor verifica tus credenciales.",
+    RATE_LIMIT_ERROR:
+      "Límite de velocidad excedido. Por favor intenta más tarde.",
+    SERVER_ERROR: "Ocurrió un error del servidor. Por favor intenta más tarde.",
+    VALIDATION_ERROR:
+      "Entrada inválida. Por favor verifica tus datos e intenta de nuevo.",
+  },
+};
+
+function getErrorMessage(error: DatabiteError, locale: string = "en"): string {
+  const messages =
+    errorMessages[locale as keyof typeof errorMessages] || errorMessages.en;
+  return messages[error.type] || error.message;
+}
+```
+
+### Contextual Error Messages
+
+```typescript
+function getContextualErrorMessage(error: DatabiteError, context: any): string {
+  switch (error.type) {
+    case ErrorType.AUTHENTICATION_ERROR:
+      return `Authentication failed for ${context.service}. Please check your API key.`;
+
+    case ErrorType.RATE_LIMIT_ERROR:
+      return `Rate limit exceeded for ${context.service}. Please try again in ${context.retryAfter} seconds.`;
+
+    case ErrorType.NETWORK_ERROR:
+      return `Unable to connect to ${context.service}. Please check your network connection.`;
+
+    default:
+      return error.message;
+  }
+}
+```
+
+## Logging and Monitoring
+
+### Structured Logging
+
+```typescript
+interface LogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  message: string;
+  context: any;
+  error?: Error;
+}
+
+class Logger {
+  private logs: LogEntry[] = [];
+
+  info(message: string, context: any = {}) {
+    this.log("info", message, context);
+  }
+
+  warn(message: string, context: any = {}) {
+    this.log("warn", message, context);
+  }
+
+  error(message: string, error: Error, context: any = {}) {
+    this.log("error", message, { ...context, error });
+  }
+
+  private log(level: "info" | "warn" | "error", message: string, context: any) {
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      context,
+    };
+
+    this.logs.push(entry);
+    console.log(JSON.stringify(entry));
+  }
+
+  getLogs(level?: string): LogEntry[] {
+    if (level) {
+      return this.logs.filter((log) => log.level === level);
+    }
+    return this.logs;
+  }
+}
+
+const logger = new Logger();
+```
+
+### Error Monitoring
+
+```typescript
+class ErrorMonitor {
+  private errorCounts: Map<string, number> = new Map();
+  private errorThresholds: Map<string, number> = new Map();
+
+  constructor() {
+    this.errorThresholds.set("NETWORK_ERROR", 10);
+    this.errorThresholds.set("AUTHENTICATION_ERROR", 5);
+    this.errorThresholds.set("RATE_LIMIT_ERROR", 20);
+  }
+
+  recordError(error: DatabiteError, context: any) {
+    const key = `${error.type}:${context.service}`;
+    const count = this.errorCounts.get(key) || 0;
+    this.errorCounts.set(key, count + 1);
+
+    // Check if threshold exceeded
+    const threshold = this.errorThresholds.get(error.type) || 0;
+    if (count >= threshold) {
+      this.alert(error, context);
+    }
+  }
+
+  private alert(error: DatabiteError, context: any) {
+    // Send alert to monitoring service
+    console.error(
+      `ALERT: ${error.type} threshold exceeded for ${context.service}`
+    );
+  }
+
+  getErrorCounts(): Map<string, number> {
+    return new Map(this.errorCounts);
+  }
+}
+
+const errorMonitor = new ErrorMonitor();
+```
+
+## Testing Error Handling
+
+### Error Simulation
+
+```typescript
+describe("Error Handling", () => {
+  it("should handle network errors gracefully", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "test-connector",
+        name: "Test Connector",
+      })
+      .actions([
+        {
+          id: "test_action",
+          name: "Test Action",
+          description: "Test action",
+          inputs: {},
+          execute: async () => {
+            throw new Error("Network error");
+          },
+        },
+      ])
+      .build();
+
+    const result = await connector.actions.test_action.execute(
+      {},
+      { config: {}, tokens: {} }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Network error");
+  });
+
+  it("should retry on transient errors", async () => {
+    let attemptCount = 0;
+
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "retry-test-connector",
+        name: "Retry Test Connector",
+      })
+      .actions([
+        {
+          id: "retry_action",
+          name: "Retry Action",
+          description: "Retry action",
+          inputs: {},
+          execute: async () => {
+            attemptCount++;
+            if (attemptCount < 3) {
+              throw new Error("Temporary error");
+            }
+            return { success: true };
+          },
+        },
+      ])
+      .build();
+
+    const result = await retryWithBackoff(
+      () =>
+        connector.actions.retry_action.execute({}, { config: {}, tokens: {} }),
+      3,
+      100
+    );
+
+    expect(result.success).toBe(true);
+    expect(attemptCount).toBe(3);
+  });
+});
+```
+
+## Best Practices
+
+### Error Handling Strategy
+
+<Tip>
+  Implement a layered error handling strategy: prevent errors where possible,
+  handle expected errors gracefully, and log unexpected errors for debugging.
+</Tip>
+
+```typescript
+const layeredErrorHandling = {
+  // Layer 1: Input validation
+  validateInputs: (inputs: any) => {
+    if (!inputs.required_field) {
+      throw new DatabiteError(
+        "Required field is missing",
+        ErrorType.VALIDATION_ERROR,
+        undefined,
+        false
+      );
+    }
+  },
+
+  // Layer 2: Retry logic
+  executeWithRetry: async (operation: () => Promise<any>) => {
+    return retryWithBackoff(operation, 3, 1000);
+  },
+
+  // Layer 3: Error classification and handling
+  handleError: (error: any, context: any) => {
+    const classifiedError = classifyError(error);
+    errorMonitor.recordError(classifiedError, context);
+
+    if (classifiedError.retryable) {
+      throw classifiedError; // Let retry logic handle it
+    }
+
+    return {
+      success: false,
+      error: getContextualErrorMessage(classifiedError, context),
+    };
+  },
+};
+```
+
+### Error Recovery Patterns
+
+<Warning>
+  Always provide users with actionable error messages and recovery options.
+</Warning>
+
+```typescript
+const recoveryPatterns = {
+  // Pattern 1: Automatic retry
+  automaticRetry: {
+    onError: "retry_with_backoff",
+    maxRetries: 3,
+    retryDelay: 1000,
+  },
+
+  // Pattern 2: User intervention
+  userIntervention: {
+    onError: "show_error_dialog",
+    message: "An error occurred. Please try again or contact support.",
+    actions: ["retry", "cancel", "contact_support"],
+  },
+
+  // Pattern 3: Fallback operation
+  fallbackOperation: {
+    onError: "try_fallback",
+    fallback: "alternative_api_call",
+  },
+};
+```
+
+## Common Issues and Solutions
+
+### Issue: Silent Failures
+
+<Note>
+  Always log errors and provide feedback to users. Silent failures make
+  debugging difficult.
+</Note>
+
+```typescript
+// ❌ Bad: Silent failure
+const silentFailure = async () => {
+  try {
+    await riskyOperation();
+  } catch (error) {
+    // Silent failure - no logging or user feedback
+  }
+};
+
+// ✅ Good: Proper error handling
+const properErrorHandling = async () => {
+  try {
+    await riskyOperation();
+  } catch (error) {
+    logger.error("Operation failed", error as Error, {
+      operation: "riskyOperation",
+    });
+    throw new DatabiteError(
+      "Operation failed. Please try again.",
+      ErrorType.UNKNOWN_ERROR,
+      undefined,
+      true
+    );
+  }
+};
+```
+
+### Issue: Error Message Exposure
+
+```typescript
+// ❌ Bad: Exposing internal errors
+const exposeInternalError = (error: any) => {
+  return {
+    success: false,
+    error: error.message, // Exposes internal implementation details
+  };
+};
+
+// ✅ Good: User-friendly error messages
+const userFriendlyError = (error: any) => {
+  const classifiedError = classifyError(error);
+  return {
+    success: false,
+    error: getContextualErrorMessage(classifiedError, { service: "api" }),
+  };
+};
+```
+
+## Next Steps
+
+Now that you understand error handling, you can:
+
+1. **Implement Monitoring**: Set up comprehensive error monitoring and alerting
+2. **Test Error Scenarios**: Create robust tests for error conditions
+3. **Optimize Recovery**: Improve error recovery and user experience
+4. **Scale Error Handling**: Design error handling patterns that scale
+
+Continue to the [Testing Connectors Guide](/guides/testing-connectors) to learn how to test your connectors thoroughly.

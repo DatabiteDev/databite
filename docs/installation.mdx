@@ -1,0 +1,231 @@
+---
+title: "Installation"
+description: "Install and configure the Databite SDK packages"
+---
+
+## Prerequisites
+
+Before installing Databite SDK, ensure you have:
+
+- **Node.js** >= 16.0.0
+- **TypeScript** >= 4.5.0 (recommended)
+- **npm**, **yarn**, **pnpm**, or **bun** package manager
+
+## Core Installation
+
+Install the essential Databite packages:
+
+```bash
+npm install @databite/build @databite/flow @databite/types
+```
+
+<Warning>
+  These three packages are the core of the Databite SDK and are required for
+  most use cases.
+</Warning>
+
+## Additional Packages
+
+Install additional packages based on your needs:
+
+### React Integration
+
+For React applications with UI components:
+
+```bash
+npm install @databite/connect
+```
+
+**Peer Dependencies:**
+
+```bash
+npm install react react-dom
+```
+
+### Pre-built Connectors
+
+For ready-to-use connectors:
+
+```bash
+npm install @databite/connectors
+```
+
+### Data Synchronization
+
+For automated data synchronization:
+
+```bash
+npm install @databite/engine
+```
+
+**Peer Dependencies:**
+
+```bash
+npm install bullmq
+```
+
+### AI Connector Generation
+
+For AI-powered connector generation:
+
+```bash
+npm install @databite/ai
+```
+
+## Package Manager Options
+
+### npm
+
+```bash
+# Core packages
+npm install @databite/build @databite/flow @databite/types
+
+# Additional packages
+npm install @databite/connect @databite/connectors @databite/engine @databite/ai
+```
+
+### yarn
+
+```bash
+# Core packages
+yarn add @databite/build @databite/flow @databite/types
+
+# Additional packages
+yarn add @databite/connect @databite/connectors @databite/engine @databite/ai
+```
+
+### pnpm
+
+```bash
+# Core packages
+pnpm add @databite/build @databite/flow @databite/types
+
+# Additional packages
+pnpm add @databite/connect @databite/connectors @databite/engine @databite/ai
+```
+
+### bun
+
+```bash
+# Core packages
+bun add @databite/build @databite/flow @databite/types
+
+# Additional packages
+bun add @databite/connect @databite/connectors @databite/engine @databite/ai
+```
+
+## TypeScript Configuration
+
+Ensure your `tsconfig.json` includes the necessary compiler options:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
+  }
+}
+```
+
+## Environment Setup
+
+### Node.js Environment
+
+For server-side usage:
+
+```typescript
+// No additional setup required
+import { createConnector } from "@databite/build";
+```
+
+### Browser Environment
+
+For client-side usage with React:
+
+```typescript
+import { ConnectModal } from "@databite/connect";
+import { createFlow } from "@databite/flow";
+```
+
+### Next.js
+
+For Next.js applications:
+
+```typescript
+// pages/api/connectors.ts
+import { createConnector } from "@databite/build";
+
+// components/ConnectButton.tsx
+import { ConnectModal } from "@databite/connect";
+```
+
+## Verification
+
+Test your installation by creating a simple connector:
+
+```typescript
+import { createConnector } from "@databite/build";
+import { z } from "zod";
+
+const testConnector = createConnector()
+  .withIdentity("test", "Test Connector")
+  .withVersion("1.0.0")
+  .withAuthor("Test")
+  .withDescription("Test connector")
+  .withIntegrationConfig(z.object({}))
+  .withConnectionConfig(z.object({}))
+  .build();
+
+console.log("Databite SDK installed successfully!");
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="TypeScript Errors">
+    Ensure you have TypeScript >= 4.5.0 installed and properly configured. Check
+    your `tsconfig.json` for the correct compiler options.
+  </Accordion>
+  <Accordion title="Peer Dependency Warnings">
+    Install the required peer dependencies for the packages you're using. Each
+    package's documentation lists its peer dependencies.
+  </Accordion>
+  <Accordion title="Module Resolution Issues">
+    Make sure your `tsconfig.json` has `"moduleResolution": "node"` and
+    `"esModuleInterop": true` enabled.
+  </Accordion>
+  <Accordion title="React Hooks Errors">
+    If using `@databite/connect`, ensure you're using React 16.8+ and have
+    `react` and `react-dom` installed.
+  </Accordion>
+</AccordionGroup>
+
+### Getting Help
+
+If you encounter issues:
+
+1. Check the [Common Issues guide](/guides/common-issues)
+2. Review the [Debugging guide](/guides/debugging)
+3. Join our [Discord community](https://discord.gg/databite)
+4. Open an issue on [GitHub](https://github.com/databite/databite/issues)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Build your first connector
+  </Card>
+  <Card title="Package Documentation" icon="book" href="/packages/types">
+    Explore detailed package documentation
+  </Card>
+</CardGroup>

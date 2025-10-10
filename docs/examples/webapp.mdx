@@ -1,0 +1,404 @@
+---
+title: "Example Web App"
+description: "A comprehensive Next.js web application demonstrating the Databite SDK in action"
+---
+
+## Overview
+
+The Databite Example Web App is a comprehensive Next.js application that demonstrates how to integrate the Databite SDK into a real-world web application. It showcases connector integration, connection management, data synchronization workflows, and UI components.
+
+## Repository
+
+The example web app is available in our open-source repository:
+
+<Card
+  title="View on GitHub"
+  icon="github"
+  href="https://github.com/databite/databite/tree/main/packages/example-webapp"
+>
+  Explore the complete implementation with source code, tests, and deployment
+  configuration
+</Card>
+
+## Features Demonstrated
+
+### Connector Integration
+
+- **Multiple Connectors**: Integration with Slack, Trello, and other popular services
+- **Authentication Flows**: OAuth and API key authentication patterns
+- **Type Safety**: Full TypeScript integration with the Databite SDK
+
+### Connection Management
+
+- **Connection UI**: Pre-built React components for connection management
+- **Status Tracking**: Real-time connection status and health monitoring
+- **Error Handling**: Robust error handling and user feedback
+
+### Data Synchronization
+
+- **Real-time Sync**: Live data synchronization with external services
+- **Scheduled Sync**: Automated data synchronization with cron scheduling
+- **Data Export**: Automatic data persistence and export functionality
+
+### Flow Execution
+
+- **Interactive Workflows**: User-friendly authentication and data processing flows
+- **Form Handling**: Built-in form validation and user input processing
+- **Progress Tracking**: Visual progress indicators and status updates
+
+## Project Structure
+
+```
+example-webapp/
+├── app/                    # Next.js app directory
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/             # React components
+├── lib/                    # Utility functions
+│   └── utils.ts
+├── __tests__/              # Test files
+│   ├── App.test.tsx
+│   ├── setup.ts
+│   └── utils.test.ts
+├── package.json
+├── tsconfig.json
+├── next.config.ts
+└── README.md
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 16.0.0
+- npm, yarn, pnpm, or bun
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/databite/databite.git
+cd databite/packages/example-webapp
+
+# Install dependencies
+npm install
+
+# Or with other package managers
+yarn install
+pnpm install
+bun install
+```
+
+### Development
+
+Start the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Key Implementation Examples
+
+### Basic Connector Setup
+
+```typescript
+import { ConnectModal } from "@databite/connect";
+import { slackConnector } from "@databite/connectors";
+
+function SlackIntegration() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <ConnectModal
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      integration={slackConnector.createIntegration("My Slack", {
+        clientId: process.env.NEXT_PUBLIC_SLACK_CLIENT_ID,
+        clientSecret: process.env.SLACK_CLIENT_SECRET,
+        redirectUri: `${window.location.origin}/auth/slack/callback`,
+      })}
+      onAuthSuccess={(integration, config) => {
+        console.log("Slack connected:", config);
+        // Save connection to your backend
+      }}
+    />
+  );
+}
+```
+
+### Data Synchronization
+
+```typescript
+import { DatabiteEngine } from "@databite/engine";
+
+const engine = new DatabiteEngine({
+  dataProvider: async () => {
+    // Fetch connections and integrations from your database
+    return {
+      connections: await fetchConnections(),
+      integrations: await fetchIntegrations(),
+    };
+  },
+  dataExporter: async ({ connections, integrations }) => {
+    // Save data to your database
+    await saveConnections(connections);
+    await saveIntegrations(integrations);
+    return { success: true, error: null };
+  },
+  schedulerAdapter: new BullMQAdapter(),
+  minutesBetweenSyncs: 5,
+});
+```
+
+### Flow Execution
+
+```typescript
+import { createFlow, FlowRenderer } from "@databite/flow";
+
+const userOnboardingFlow = createFlow("userOnboarding")
+  .form("getUserInfo", {
+    title: "Welcome! Let's get started",
+    fields: [
+      { name: "name", label: "Full Name", required: true },
+      { name: "email", label: "Email Address", type: "email", required: true },
+    ],
+  })
+  .http("createUser", {
+    url: "/api/users",
+    method: "POST",
+    returnType: { id: "", name: "", email: "" },
+    body: (input) => ({
+      name: input.getUserInfo.name,
+      email: input.getUserInfo.email,
+    }),
+  })
+  .display("showSuccess", {
+    title: "Success!",
+    content: (input) => `Welcome ${input.createUser.name}!`,
+  })
+  .build();
+
+function OnboardingPage() {
+  return (
+    <FlowRenderer
+      flow={userOnboardingFlow}
+      onComplete={(result) => {
+        console.log("Onboarding completed:", result.data);
+      }}
+    />
+  );
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```bash
+# Slack Integration
+NEXT_PUBLIC_SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+
+# Trello Integration
+NEXT_PUBLIC_TRELLO_API_KEY=your-trello-api-key
+TRELLO_API_TOKEN=your-trello-api-token
+
+# Database
+DATABASE_URL=your-database-url
+
+# Authentication
+NEXTAUTH_SECRET=your-nextauth-secret
+NEXTAUTH_URL=http://localhost:3000
+```
+
+### Database Setup
+
+This example uses Prisma for database management:
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Run database migrations
+npx prisma db push
+
+# Seed the database
+npx prisma db seed
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## Deployment
+
+### Vercel (Recommended)
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new):
+
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Set your environment variables in the Vercel dashboard
+4. Deploy!
+
+### Other Platforms
+
+This application can be deployed to any platform that supports Next.js:
+
+- **Netlify**: Use the Next.js build command
+- **Railway**: Deploy directly from GitHub
+- **Docker**: Use the included Dockerfile
+- **AWS/GCP/Azure**: Use their respective deployment services
+
+## Key Learning Points
+
+### 1. Connector Integration Patterns
+
+The example demonstrates several patterns for integrating connectors:
+
+- **Modal-based Authentication**: Using `ConnectModal` for user-friendly authentication
+- **Connection State Management**: Managing connection status and health
+- **Error Handling**: Graceful error handling and user feedback
+
+### 2. Data Synchronization Strategies
+
+- **Real-time Sync**: Immediate data synchronization when connections are established
+- **Scheduled Sync**: Automated data synchronization using cron schedules
+- **Data Export**: Automatic data persistence and export functionality
+
+### 3. Flow-based User Experiences
+
+- **Interactive Forms**: User-friendly forms with validation and error handling
+- **Progress Tracking**: Visual progress indicators and status updates
+- **Workflow Management**: Complex multi-step workflows with conditional logic
+
+### 4. Type Safety and Error Handling
+
+- **TypeScript Integration**: Full type safety across all components
+- **Error Boundaries**: React error boundaries for graceful error handling
+- **Validation**: Form validation and data validation using Zod schemas
+
+## Extending the Example
+
+### Adding New Connectors
+
+```typescript
+// Create a new connector
+const customConnector = createConnector()
+  .withIdentity("custom-service", "Custom Service")
+  .withVersion("1.0.0")
+  .withAuthor("Your Name")
+  .withDescription("Custom service connector")
+  .withIntegrationConfig(customIntegrationConfig)
+  .withConnectionConfig(customConnectionConfig)
+  .withActions({
+    customAction: createAction({
+      label: "Custom Action",
+      description: "Perform a custom action",
+      inputSchema: customInputSchema,
+      outputSchema: customOutputSchema,
+      handler: async (params, connection) => {
+        // Your custom implementation
+      },
+    }),
+  })
+  .build();
+
+// Add to your application
+const integrations = [
+  // ... existing integrations
+  customConnector.createIntegration("Custom Integration", config),
+];
+```
+
+### Custom UI Components
+
+```typescript
+// Create custom UI components
+function CustomConnectionCard({
+  integration,
+  connection,
+  onConnect,
+  onDisconnect,
+}) {
+  return (
+    <div className="border rounded-lg p-4">
+      <h3 className="font-semibold">{integration.name}</h3>
+      <p className="text-sm text-gray-600">
+        {connection ? "Connected" : "Not connected"}
+      </p>
+      <div className="mt-4">
+        {connection ? (
+          <button
+            onClick={() => onDisconnect(integration.id)}
+            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            onClick={() => onConnect(integration)}
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Connect
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### Custom Flows
+
+```typescript
+// Create custom flows
+const customFlow = createFlow("customFlow")
+  .form("getInput", {
+    title: "Custom Input",
+    fields: [{ name: "value", label: "Enter a value", required: true }],
+  })
+  .transform("processInput", (input) => ({
+    processed: input.getInput.value.toUpperCase(),
+  }))
+  .display("showResult", {
+    title: "Result",
+    content: (input) => `Processed: ${input.processInput.processed}`,
+  })
+  .build();
+```
+
+## Contributing
+
+We welcome contributions to the example web app! Please see our [Contributing Guide](https://github.com/databite/databite/blob/main/CONTRIBUTING.md) for details.
+
+## Related Resources
+
+- [Databite SDK Documentation](/packages/build) - Core SDK documentation
+- [Flow Engine Documentation](/packages/flow) - Flow engine documentation
+- [Connectors Documentation](/packages/connectors) - Pre-built connectors
+- [Engine Documentation](/packages/engine) - Data synchronization and execution engine
+- [GitHub Repository](https://github.com/databite/databite) - Source code and issues

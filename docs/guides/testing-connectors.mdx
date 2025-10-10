@@ -1,0 +1,883 @@
+---
+title: "Testing Connectors"
+description: "Learn how to test your Databite connectors thoroughly with unit tests, integration tests, and end-to-end tests"
+---
+
+import { Steps, Card, Note, Warning, Tip } from "@mintlify/components";
+
+# Testing Connectors
+
+Testing is essential for building reliable data integrations. This guide shows you how to implement comprehensive testing strategies for your Databite connectors, including unit tests, integration tests, and end-to-end tests.
+
+## Overview
+
+Effective testing of Databite connectors involves:
+
+- **Unit tests** for individual functions and methods
+- **Integration tests** for API interactions and data flows
+- **End-to-end tests** for complete user workflows
+- **Mocking strategies** for external dependencies
+- **Test data management** for consistent testing
+
+## Unit Testing
+
+### Basic Unit Tests
+
+```typescript
+import { ConnectorBuilder } from "@databite/build";
+import { describe, it, expect, beforeEach } from "jest";
+
+describe("Custom Connector", () => {
+  let connector: any;
+
+  beforeEach(() => {
+    connector = new ConnectorBuilder()
+      .identity({
+        id: "test-connector",
+        name: "Test Connector",
+        description: "A test connector",
+      })
+      .configuration({
+        api_key: {
+          type: "string",
+          label: "API Key",
+          required: true,
+        },
+      })
+      .actions([
+        {
+          id: "test_action",
+          name: "Test Action",
+          description: "Test action",
+          inputs: {
+            input: {
+              type: "string",
+              label: "Input",
+              required: true,
+            },
+          },
+          execute: async (inputs) => {
+            return { result: inputs.input };
+          },
+        },
+      ])
+      .build();
+  });
+
+  it("should execute action successfully", async () => {
+    const result = await connector.actions.test_action.execute(
+      { input: "test" },
+      { config: { api_key: "test_key" }, tokens: {} }
+    );
+
+    expect(result.result).toBe("test");
+  });
+
+  it("should validate required inputs", async () => {
+    await expect(
+      connector.actions.test_action.execute(
+        {},
+        { config: { api_key: "test_key" }, tokens: {} }
+      )
+    ).rejects.toThrow("Input is required");
+  });
+});
+```
+
+### Testing Error Handling
+
+```typescript
+describe("Error Handling", () => {
+  it("should handle API errors gracefully", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "error-test-connector",
+        name: "Error Test Connector",
+      })
+      .actions([
+        {
+          id: "error_action",
+          name: "Error Action",
+          description: "Action that throws error",
+          inputs: {},
+          execute: async () => {
+            throw new Error("API error");
+          },
+        },
+      ])
+      .build();
+
+    const result = await connector.actions.error_action.execute(
+      {},
+      { config: {}, tokens: {} }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("API error");
+  });
+
+  it("should retry on transient errors", async () => {
+    let attemptCount = 0;
+
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "retry-test-connector",
+        name: "Retry Test Connector",
+      })
+      .actions([
+        {
+          id: "retry_action",
+          name: "Retry Action",
+          description: "Action with retry logic",
+          inputs: {},
+          execute: async () => {
+            attemptCount++;
+            if (attemptCount < 3) {
+              throw new Error("Temporary error");
+            }
+            return { success: true };
+          },
+        },
+      ])
+      .build();
+
+    const result = await retryWithBackoff(
+      () =>
+        connector.actions.retry_action.execute({}, { config: {}, tokens: {} }),
+      3,
+      100
+    );
+
+    expect(result.success).toBe(true);
+    expect(attemptCount).toBe(3);
+  });
+});
+```
+
+## Integration Testing
+
+### API Integration Tests
+
+```typescript
+describe("API Integration", () => {
+  it("should handle real API calls", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "integration-test-connector",
+        name: "Integration Test Connector",
+      })
+      .configuration({
+        api_key: {
+          type: "string",
+          label: "API Key",
+          required: true,
+        },
+      })
+      .actions([
+        {
+          id: "get_posts",
+          name: "Get Posts",
+          description: "Get posts from JSONPlaceholder",
+          inputs: {},
+          execute: async (inputs, context) => {
+            const response = await fetch(
+              "https://jsonplaceholder.typicode.com/posts"
+            );
+            return response.json();
+          },
+        },
+      ])
+      .build();
+
+    const result = await connector.actions.get_posts.execute(
+      {},
+      { config: { api_key: "test" }, tokens: {} }
+    );
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0]).toHaveProperty("id");
+    expect(result[0]).toHaveProperty("title");
+  });
+
+  it("should handle authentication errors", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "auth-test-connector",
+        name: "Auth Test Connector",
+      })
+      .configuration({
+        api_key: {
+          type: "string",
+          label: "API Key",
+          required: true,
+        },
+      })
+      .actions([
+        {
+          id: "authenticated_call",
+          name: "Authenticated Call",
+          description: "Make authenticated API call",
+          inputs: {},
+          execute: async (inputs, context) => {
+            const response = await fetch("https://httpbin.org/status/401", {
+              headers: {
+                Authorization: `Bearer ${context.tokens.api_key}`,
+              },
+            });
+
+            if (response.status === 401) {
+              throw new Error("Authentication failed");
+            }
+
+            return response.json();
+          },
+        },
+      ])
+      .build();
+
+    await expect(
+      connector.actions.authenticated_call.execute(
+        {},
+        { config: { api_key: "invalid" }, tokens: {} }
+      )
+    ).rejects.toThrow("Authentication failed");
+  });
+});
+```
+
+### Database Integration Tests
+
+```typescript
+describe("Database Integration", () => {
+  let testDb: any;
+
+  beforeEach(async () => {
+    testDb = await setupTestDatabase();
+  });
+
+  afterEach(async () => {
+    await cleanupTestDatabase(testDb);
+  });
+
+  it("should sync data to database", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "db-sync-connector",
+        name: "DB Sync Connector",
+      })
+      .syncs([
+        {
+          id: "sync_posts",
+          name: "Sync Posts",
+          description: "Sync posts to database",
+          source: {
+            type: "api",
+            url: "https://jsonplaceholder.typicode.com/posts",
+          },
+          destination: {
+            type: "database",
+            table: "posts",
+            connection: testDb,
+          },
+          transform: {
+            id: "{{item.id}}",
+            title: "{{item.title}}",
+            body: "{{item.body}}",
+            user_id: "{{item.userId}}",
+          },
+        },
+      ])
+      .build();
+
+    await connector.syncs.sync_posts.execute({
+      config: {},
+      tokens: {},
+    });
+
+    const posts = await testDb.query("SELECT * FROM posts");
+    expect(posts.length).toBeGreaterThan(0);
+    expect(posts[0]).toHaveProperty("id");
+    expect(posts[0]).toHaveProperty("title");
+  });
+});
+```
+
+## Mocking Strategies
+
+### API Mocking
+
+```typescript
+import { jest } from "@jest/globals";
+
+// Mock fetch globally
+global.fetch = jest.fn();
+
+describe("API Mocking", () => {
+  beforeEach(() => {
+    (fetch as jest.Mock).mockClear();
+  });
+
+  it("should mock successful API response", async () => {
+    const mockResponse = {
+      id: 1,
+      name: "Test User",
+      email: "test@example.com",
+    };
+
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "mock-test-connector",
+        name: "Mock Test Connector",
+      })
+      .actions([
+        {
+          id: "get_user",
+          name: "Get User",
+          description: "Get user by ID",
+          inputs: {
+            user_id: {
+              type: "string",
+              label: "User ID",
+              required: true,
+            },
+          },
+          execute: async (inputs, context) => {
+            const response = await fetch(
+              `https://api.service.com/users/${inputs.user_id}`
+            );
+            return response.json();
+          },
+        },
+      ])
+      .build();
+
+    const result = await connector.actions.get_user.execute(
+      { user_id: "1" },
+      { config: {}, tokens: {} }
+    );
+
+    expect(result).toEqual(mockResponse);
+    expect(fetch).toHaveBeenCalledWith("https://api.service.com/users/1");
+  });
+
+  it("should mock API error response", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    });
+
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "error-mock-connector",
+        name: "Error Mock Connector",
+      })
+      .actions([
+        {
+          id: "get_user",
+          name: "Get User",
+          description: "Get user by ID",
+          inputs: {
+            user_id: {
+              type: "string",
+              label: "User ID",
+              required: true,
+            },
+          },
+          execute: async (inputs, context) => {
+            const response = await fetch(
+              `https://api.service.com/users/${inputs.user_id}`
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
+            }
+
+            return response.json();
+          },
+        },
+      ])
+      .build();
+
+    await expect(
+      connector.actions.get_user.execute(
+        { user_id: "999" },
+        { config: {}, tokens: {} }
+      )
+    ).rejects.toThrow("HTTP 404: Not Found");
+  });
+});
+```
+
+### Database Mocking
+
+```typescript
+// Mock database connection
+const mockDb = {
+  query: jest.fn(),
+  transaction: jest.fn(),
+  close: jest.fn(),
+};
+
+describe("Database Mocking", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should mock database query", async () => {
+    const mockResult = [
+      { id: 1, name: "Test User", email: "test@example.com" },
+    ];
+
+    mockDb.query.mockResolvedValueOnce(mockResult);
+
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "db-mock-connector",
+        name: "DB Mock Connector",
+      })
+      .actions([
+        {
+          id: "query_users",
+          name: "Query Users",
+          description: "Query users from database",
+          inputs: {},
+          execute: async (inputs, context) => {
+            return mockDb.query("SELECT * FROM users");
+          },
+        },
+      ])
+      .build();
+
+    const result = await connector.actions.query_users.execute(
+      {},
+      { config: {}, tokens: {} }
+    );
+
+    expect(result).toEqual(mockResult);
+    expect(mockDb.query).toHaveBeenCalledWith("SELECT * FROM users");
+  });
+});
+```
+
+## End-to-End Testing
+
+### Complete Workflow Tests
+
+```typescript
+describe("End-to-End Workflows", () => {
+  it("should complete full authentication and data sync workflow", async () => {
+    // Setup test environment
+    const testConfig = {
+      api_key: "test_api_key",
+      base_url: "https://api.test.com",
+    };
+
+    // Mock authentication flow
+    const authFlow = new FlowBuilder()
+      .form("api_key_form", {
+        title: "Enter API Key",
+        fields: [
+          {
+            name: "api_key",
+            type: "password",
+            label: "API Key",
+            required: true,
+          },
+        ],
+        submitText: "Connect",
+        action: "validate_api_key",
+      })
+      .http("validate_api_key", {
+        method: "GET",
+        url: "https://api.test.com/user",
+        headers: {
+          Authorization: "Bearer {{form.api_key}}",
+        },
+      })
+      .build();
+
+    // Mock API responses
+    (fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 1, username: "testuser" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 1, title: "Test Post", body: "Test content" }],
+      });
+
+    // Create connector with auth flow and sync
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "e2e-test-connector",
+        name: "E2E Test Connector",
+      })
+      .configuration({
+        api_key: {
+          type: "string",
+          label: "API Key",
+          required: true,
+        },
+      })
+      .flows([authFlow])
+      .syncs([
+        {
+          id: "sync_posts",
+          name: "Sync Posts",
+          description: "Sync posts from API",
+          source: {
+            type: "api",
+            url: "https://api.test.com/posts",
+            headers: {
+              Authorization: "Bearer {{tokens.api_key}}",
+            },
+          },
+          destination: {
+            type: "database",
+            table: "posts",
+          },
+          transform: {
+            id: "{{item.id}}",
+            title: "{{item.title}}",
+            body: "{{item.body}}",
+          },
+        },
+      ])
+      .build();
+
+    // Execute authentication flow
+    const authResult = await authFlow.execute({
+      config: testConfig,
+      form: { api_key: "test_api_key" },
+    });
+
+    expect(authResult.success).toBe(true);
+    expect(authResult.tokens.api_key).toBe("test_api_key");
+
+    // Execute sync
+    const syncResult = await connector.syncs.sync_posts.execute({
+      config: testConfig,
+      tokens: { api_key: "test_api_key" },
+    });
+
+    expect(syncResult.success).toBe(true);
+    expect(syncResult.recordsProcessed).toBe(1);
+  });
+});
+```
+
+## Test Data Management
+
+### Test Data Factories
+
+```typescript
+class TestDataFactory {
+  static createUser(overrides: Partial<User> = {}): User {
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      name: "Test User",
+      email: "test@example.com",
+      created_at: new Date().toISOString(),
+      ...overrides,
+    };
+  }
+
+  static createPost(overrides: Partial<Post> = {}): Post {
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      title: "Test Post",
+      body: "Test content",
+      user_id: "test-user-id",
+      created_at: new Date().toISOString(),
+      ...overrides,
+    };
+  }
+
+  static createApiResponse<T>(
+    data: T,
+    overrides: Partial<ApiResponse<T>> = {}
+  ): ApiResponse<T> {
+    return {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+      ...overrides,
+    };
+  }
+}
+
+// Usage in tests
+describe("Test Data Management", () => {
+  it("should use test data factories", () => {
+    const user = TestDataFactory.createUser({
+      name: "Custom User",
+      email: "custom@example.com",
+    });
+
+    expect(user.name).toBe("Custom User");
+    expect(user.email).toBe("custom@example.com");
+    expect(user.id).toBeDefined();
+  });
+});
+```
+
+### Test Database Setup
+
+```typescript
+async function setupTestDatabase() {
+  const db = await createTestDatabase();
+
+  // Create test tables
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id VARCHAR(255) PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      body TEXT,
+      user_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  return db;
+}
+
+async function cleanupTestDatabase(db: any) {
+  await db.query("DROP TABLE IF EXISTS posts");
+  await db.query("DROP TABLE IF EXISTS users");
+  await db.close();
+}
+```
+
+## Performance Testing
+
+### Load Testing
+
+```typescript
+describe("Performance Testing", () => {
+  it("should handle concurrent requests", async () => {
+    const connector = new ConnectorBuilder()
+      .identity({
+        id: "performance-test-connector",
+        name: "Performance Test Connector",
+      })
+      .actions([
+        {
+          id: "concurrent_action",
+          name: "Concurrent Action",
+          description: "Action for concurrent testing",
+          inputs: {},
+          execute: async (inputs, context) => {
+            // Simulate API call
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return { success: true, timestamp: Date.now() };
+          },
+        },
+      ])
+      .build();
+
+    const startTime = Date.now();
+    const promises = Array(10)
+      .fill(null)
+      .map(() =>
+        connector.actions.concurrent_action.execute(
+          {},
+          { config: {}, tokens: {} }
+        )
+      );
+
+    const results = await Promise.all(promises);
+    const endTime = Date.now();
+
+    expect(results).toHaveLength(10);
+    expect(results.every((r) => r.success)).toBe(true);
+    expect(endTime - startTime).toBeLessThan(2000); // Should complete within 2 seconds
+  });
+});
+```
+
+## Best Practices
+
+### Test Organization
+
+<Tip>
+  Organize tests by feature and use descriptive test names that explain what is
+  being tested.
+</Tip>
+
+```typescript
+describe("User Management Connector", () => {
+  describe("Authentication", () => {
+    it("should authenticate with valid API key", async () => {
+      // Test implementation
+    });
+
+    it("should reject invalid API key", async () => {
+      // Test implementation
+    });
+  });
+
+  describe("User Operations", () => {
+    it("should create user successfully", async () => {
+      // Test implementation
+    });
+
+    it("should update user information", async () => {
+      // Test implementation
+    });
+
+    it("should delete user", async () => {
+      // Test implementation
+    });
+  });
+
+  describe("Data Synchronization", () => {
+    it("should sync users from API to database", async () => {
+      // Test implementation
+    });
+
+    it("should handle sync errors gracefully", async () => {
+      // Test implementation
+    });
+  });
+});
+```
+
+### Test Coverage
+
+<Warning>
+  Aim for high test coverage but focus on testing critical paths and edge cases
+  rather than achieving 100% coverage.
+</Warning>
+
+```typescript
+// Test critical paths
+describe("Critical Paths", () => {
+  it("should handle happy path", async () => {
+    // Test normal operation
+  });
+
+  it("should handle error conditions", async () => {
+    // Test error handling
+  });
+
+  it("should handle edge cases", async () => {
+    // Test boundary conditions
+  });
+});
+```
+
+### Test Isolation
+
+```typescript
+describe("Test Isolation", () => {
+  let connector: any;
+  let mockDb: any;
+
+  beforeEach(async () => {
+    // Setup fresh test environment
+    mockDb = await createTestDatabase();
+    connector = createTestConnector(mockDb);
+  });
+
+  afterEach(async () => {
+    // Cleanup after each test
+    await cleanupTestDatabase(mockDb);
+  });
+
+  it("should not affect other tests", async () => {
+    // Test implementation
+  });
+});
+```
+
+## Common Issues and Solutions
+
+### Issue: Flaky Tests
+
+<Note>
+  Flaky tests are often caused by timing issues, shared state, or external
+  dependencies. Use proper mocking and test isolation to prevent them.
+</Note>
+
+```typescript
+// ❌ Bad: Flaky test with timing issues
+it("should complete within 1 second", async () => {
+  const result = await slowOperation();
+  expect(result).toBeDefined();
+});
+
+// ✅ Good: Stable test with proper timing
+it("should complete operation", async () => {
+  const startTime = Date.now();
+  const result = await slowOperation();
+  const duration = Date.now() - startTime;
+
+  expect(result).toBeDefined();
+  expect(duration).toBeLessThan(5000); // More reasonable timeout
+});
+```
+
+### Issue: Test Data Pollution
+
+```typescript
+// ❌ Bad: Tests affecting each other
+describe("User Tests", () => {
+  it("should create user", async () => {
+    await createUser({ name: "Test User" });
+    // Test implementation
+  });
+
+  it("should find user", async () => {
+    const user = await findUser("Test User"); // May fail if previous test failed
+    expect(user).toBeDefined();
+  });
+});
+
+// ✅ Good: Isolated tests
+describe("User Tests", () => {
+  beforeEach(async () => {
+    await cleanupDatabase();
+  });
+
+  it("should create user", async () => {
+    const user = await createUser({ name: "Test User" });
+    expect(user).toBeDefined();
+  });
+
+  it("should find user", async () => {
+    await createUser({ name: "Test User" });
+    const user = await findUser("Test User");
+    expect(user).toBeDefined();
+  });
+});
+```
+
+## Next Steps
+
+Now that you understand testing connectors, you can:
+
+1. **Implement CI/CD**: Set up automated testing in your CI/CD pipeline
+2. **Add Monitoring**: Implement test monitoring and reporting
+3. **Optimize Performance**: Improve test execution speed and reliability
+4. **Expand Coverage**: Add more comprehensive test scenarios
+
+Continue to the [AI Connector Generation Guide](/guides/ai-connector-generation) to learn how to use AI to generate connectors automatically.

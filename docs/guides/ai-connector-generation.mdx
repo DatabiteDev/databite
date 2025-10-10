@@ -1,0 +1,678 @@
+---
+title: "AI Connector Generation"
+description: "Learn how to use AI to automatically generate connectors from API documentation using @databite/ai"
+---
+
+import { Steps, Card, Note, Warning, Tip } from "@mintlify/components";
+
+# AI Connector Generation
+
+AI connector generation automates the creation of connectors by analyzing API documentation and generating code. This guide shows you how to use `@databite/ai` to create connectors from OpenAPI specs, API documentation, and other sources.
+
+## Overview
+
+The `@databite/ai` package provides:
+
+- **API Documentation Crawling** from various sources
+- **AI Analysis** of API structure and patterns
+- **Code Generation** for connectors, actions, and syncs
+- **Validation and Testing** of generated code
+- **Customization** of generated connectors
+
+## Quick Start
+
+### Basic AI Connector Generation
+
+```typescript
+import { DatabiteAI } from "@databite/ai";
+
+const ai = new DatabiteAI({
+  provider: "openai",
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Generate connector from OpenAPI spec
+const connector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Service Connector",
+    description: "Auto-generated connector for Service API",
+    includeAuth: true,
+    includeActions: true,
+    includeSyncs: true,
+  },
+});
+
+console.log("Generated connector:", connector);
+```
+
+### CLI Usage
+
+```bash
+# Install the AI package
+npm install @databite/ai
+
+# Generate connector from OpenAPI spec
+npx databite-ai generate \
+  --source https://api.service.com/openapi.json \
+  --output ./connectors/service-connector.ts \
+  --name "Service Connector"
+
+# Generate connector from API documentation
+npx databite-ai generate \
+  --source https://docs.service.com/api \
+  --type documentation \
+  --output ./connectors/service-connector.ts
+```
+
+## Advanced Generation Patterns
+
+### Custom Generation Options
+
+```typescript
+const customConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Service Connector",
+    description: "Customized connector for Service API",
+    includeAuth: true,
+    authType: "oauth2",
+    includeActions: true,
+    actionFilter: (action) => action.tags.includes("public"),
+    includeSyncs: true,
+    syncFilter: (sync) => sync.type === "incremental",
+    customizations: {
+      baseUrl: "https://api.service.com/v2",
+      timeout: 30000,
+      retries: 3,
+    },
+  },
+});
+```
+
+### Multi-Source Generation
+
+```typescript
+const multiSourceConnector = await ai.generateConnector({
+  source: {
+    type: "multiple",
+    sources: [
+      {
+        type: "openapi",
+        url: "https://api.service.com/openapi.json",
+      },
+      {
+        type: "documentation",
+        url: "https://docs.service.com/api",
+      },
+      {
+        type: "postman",
+        url: "https://api.service.com/postman.json",
+      },
+    ],
+  },
+  options: {
+    name: "Multi-Source Connector",
+    mergeStrategy: "merge",
+    conflictResolution: "prefer_openapi",
+  },
+});
+```
+
+## Authentication Generation
+
+### OAuth 2.0 Generation
+
+```typescript
+const oauthConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "OAuth Service Connector",
+    includeAuth: true,
+    authType: "oauth2",
+    authConfig: {
+      authorizationUrl: "https://api.service.com/oauth/authorize",
+      tokenUrl: "https://api.service.com/oauth/token",
+      scopes: ["read", "write"],
+      clientId: "{{config.client_id}}",
+      clientSecret: "{{config.client_secret}}",
+    },
+  },
+});
+```
+
+### API Key Generation
+
+```typescript
+const apiKeyConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "API Key Service Connector",
+    includeAuth: true,
+    authType: "apikey",
+    authConfig: {
+      headerName: "X-API-Key",
+      headerValue: "{{config.api_key}}",
+    },
+  },
+});
+```
+
+### Custom Authentication
+
+```typescript
+const customAuthConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Auth Service Connector",
+    includeAuth: true,
+    authType: "custom",
+    authConfig: {
+      flow: {
+        type: "form",
+        fields: [
+          {
+            name: "username",
+            type: "string",
+            label: "Username",
+            required: true,
+          },
+          {
+            name: "password",
+            type: "password",
+            label: "Password",
+            required: true,
+          },
+        ],
+        submitAction: "authenticate",
+      },
+    },
+  },
+});
+```
+
+## Action Generation
+
+### Automatic Action Discovery
+
+```typescript
+const actionConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Action Service Connector",
+    includeActions: true,
+    actionConfig: {
+      discovery: "automatic",
+      naming: "camelCase",
+      grouping: "by_tag",
+      includeExamples: true,
+    },
+  },
+});
+```
+
+### Custom Action Generation
+
+```typescript
+const customActionConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Action Service Connector",
+    includeActions: true,
+    actionConfig: {
+      discovery: "custom",
+      actions: [
+        {
+          id: "get_user",
+          name: "Get User",
+          description: "Retrieve user information",
+          method: "GET",
+          path: "/users/{id}",
+          inputs: {
+            id: {
+              type: "string",
+              label: "User ID",
+              required: true,
+            },
+          },
+        },
+        {
+          id: "create_user",
+          name: "Create User",
+          description: "Create a new user",
+          method: "POST",
+          path: "/users",
+          inputs: {
+            name: {
+              type: "string",
+              label: "Name",
+              required: true,
+            },
+            email: {
+              type: "string",
+              label: "Email",
+              required: true,
+            },
+          },
+        },
+      ],
+    },
+  },
+});
+```
+
+## Sync Generation
+
+### Data Sync Generation
+
+```typescript
+const syncConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Sync Service Connector",
+    includeSyncs: true,
+    syncConfig: {
+      discovery: "automatic",
+      syncTypes: ["incremental", "full"],
+      destination: {
+        type: "database",
+        table: "service_data",
+      },
+      schedule: {
+        type: "interval",
+        minutes: 15,
+      },
+    },
+  },
+});
+```
+
+### Custom Sync Configuration
+
+```typescript
+const customSyncConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Sync Service Connector",
+    includeSyncs: true,
+    syncConfig: {
+      discovery: "custom",
+      syncs: [
+        {
+          id: "sync_users",
+          name: "Sync Users",
+          description: "Synchronize user data",
+          source: {
+            type: "api",
+            method: "GET",
+            path: "/users",
+            query: {
+              limit: 1000,
+              offset: 0,
+            },
+          },
+          destination: {
+            type: "database",
+            table: "users",
+            mode: "upsert",
+            key: "id",
+          },
+          transform: {
+            id: "{{item.id}}",
+            name: "{{item.name}}",
+            email: "{{item.email}}",
+            created_at: "{{item.created_at}}",
+          },
+        },
+      ],
+    },
+  },
+});
+```
+
+## Code Customization
+
+### Template Customization
+
+```typescript
+const customizedConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Customized Service Connector",
+    customizations: {
+      templates: {
+        connector: "./templates/custom-connector.hbs",
+        action: "./templates/custom-action.hbs",
+        sync: "./templates/custom-sync.hbs",
+      },
+      variables: {
+        companyName: "My Company",
+        apiVersion: "v2",
+        baseUrl: "https://api.service.com/v2",
+      },
+    },
+  },
+});
+```
+
+### Code Post-Processing
+
+```typescript
+const postProcessedConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Post-Processed Service Connector",
+    postProcessing: {
+      addErrorHandling: true,
+      addLogging: true,
+      addValidation: true,
+      addRetryLogic: true,
+      customTransforms: [
+        (code) => code.replace(/console\.log/g, "logger.info"),
+        (code) => code.replace(/throw new Error/g, "throw new DatabiteError"),
+      ],
+    },
+  },
+});
+```
+
+## Testing Generated Connectors
+
+### Automatic Test Generation
+
+```typescript
+const connectorWithTests = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Tested Service Connector",
+    includeTests: true,
+    testConfig: {
+      framework: "jest",
+      coverage: true,
+      mockExternal: true,
+      includeIntegration: true,
+    },
+  },
+});
+```
+
+### Custom Test Configuration
+
+```typescript
+const customTestConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Test Service Connector",
+    includeTests: true,
+    testConfig: {
+      framework: "jest",
+      tests: [
+        {
+          type: "unit",
+          target: "actions",
+          coverage: 90,
+        },
+        {
+          type: "integration",
+          target: "syncs",
+          coverage: 80,
+        },
+        {
+          type: "e2e",
+          target: "flows",
+          coverage: 70,
+        },
+      ],
+    },
+  },
+});
+```
+
+## Best Practices
+
+### Source Selection
+
+<Tip>
+  Choose the most comprehensive and up-to-date source for your API. OpenAPI
+  specs are generally preferred over documentation for accuracy.
+</Tip>
+
+```typescript
+// ✅ Good: Use OpenAPI spec when available
+const connector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+});
+
+// ✅ Good: Use documentation as fallback
+const connector = await ai.generateConnector({
+  source: {
+    type: "documentation",
+    url: "https://docs.service.com/api",
+  },
+});
+
+// ❌ Avoid: Using outdated or incomplete sources
+const connector = await ai.generateConnector({
+  source: {
+    type: "postman",
+    url: "https://api.service.com/old-collection.json",
+  },
+});
+```
+
+### Validation and Testing
+
+<Warning>
+  Always validate and test generated connectors before using them in production.
+  Generated code may have issues that need manual review.
+</Warning>
+
+```typescript
+const validatedConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Validated Service Connector",
+    validation: {
+      checkSyntax: true,
+      checkTypes: true,
+      checkImports: true,
+      runTests: true,
+    },
+  },
+});
+
+// Manual validation
+if (!validatedConnector.valid) {
+  console.error("Validation errors:", validatedConnector.errors);
+  throw new Error("Generated connector failed validation");
+}
+```
+
+### Customization Strategy
+
+```typescript
+// Start with basic generation
+const basicConnector = await ai.generateConnector({
+  source: { type: "openapi", url: "https://api.service.com/openapi.json" },
+  options: { name: "Basic Service Connector" },
+});
+
+// Add customizations incrementally
+const customizedConnector = await ai.customizeConnector(basicConnector, {
+  addErrorHandling: true,
+  addLogging: true,
+  addRetryLogic: true,
+  customTransforms: [(code) => code.replace(/fetch\(/g, "fetchWithRetry(")],
+});
+```
+
+## Common Issues and Solutions
+
+### Issue: Incomplete API Documentation
+
+<Note>
+  If the API documentation is incomplete, consider using multiple sources or
+  manual customization to fill in the gaps.
+</Note>
+
+```typescript
+const incompleteApiConnector = await ai.generateConnector({
+  source: {
+    type: "multiple",
+    sources: [
+      { type: "openapi", url: "https://api.service.com/openapi.json" },
+      { type: "documentation", url: "https://docs.service.com/api" },
+      { type: "postman", url: "https://api.service.com/postman.json" },
+    ],
+  },
+  options: {
+    name: "Complete Service Connector",
+    mergeStrategy: "merge",
+    conflictResolution: "prefer_openapi",
+    fillGaps: true,
+  },
+});
+```
+
+### Issue: Complex Authentication
+
+```typescript
+const complexAuthConnector = await ai.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Complex Auth Service Connector",
+    includeAuth: true,
+    authType: "custom",
+    authConfig: {
+      flow: {
+        type: "multi_step",
+        steps: [
+          {
+            id: "get_auth_url",
+            type: "http",
+            method: "GET",
+            path: "/auth/url",
+          },
+          {
+            id: "submit_credentials",
+            type: "form",
+            fields: [
+              { name: "username", type: "string", required: true },
+              { name: "password", type: "password", required: true },
+            ],
+          },
+          {
+            id: "exchange_token",
+            type: "http",
+            method: "POST",
+            path: "/auth/token",
+          },
+        ],
+      },
+    },
+  },
+});
+```
+
+## Advanced Usage
+
+### Custom AI Providers
+
+```typescript
+const customAI = new DatabiteAI({
+  provider: "custom",
+  apiKey: process.env.CUSTOM_AI_API_KEY,
+  baseUrl: "https://custom-ai.com/api",
+  model: "custom-model-v1",
+});
+
+const customProviderConnector = await customAI.generateConnector({
+  source: {
+    type: "openapi",
+    url: "https://api.service.com/openapi.json",
+  },
+  options: {
+    name: "Custom Provider Connector",
+  },
+});
+```
+
+### Batch Generation
+
+```typescript
+const batchConnectors = await ai.generateConnectors([
+  {
+    source: { type: "openapi", url: "https://api.service1.com/openapi.json" },
+    options: { name: "Service 1 Connector" },
+  },
+  {
+    source: { type: "openapi", url: "https://api.service2.com/openapi.json" },
+    options: { name: "Service 2 Connector" },
+  },
+  {
+    source: { type: "openapi", url: "https://api.service3.com/openapi.json" },
+    options: { name: "Service 3 Connector" },
+  },
+]);
+
+console.log(`Generated ${batchConnectors.length} connectors`);
+```
+
+## Next Steps
+
+Now that you understand AI connector generation, you can:
+
+1. **Customize Generation**: Fine-tune the generation process for your specific needs
+2. **Integrate with CI/CD**: Automate connector generation in your build pipeline
+3. **Monitor Quality**: Implement quality checks for generated connectors
+4. **Scale Generation**: Generate connectors for multiple APIs efficiently
+
+Continue to the [React Integration Guide](/guides/react-integration) to learn how to integrate connectors with React applications.

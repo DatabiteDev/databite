@@ -1,0 +1,220 @@
+---
+title: "Quickstart"
+description: "Get up and running with Databite SDK in 5 minutes"
+---
+
+## Installation
+
+Install the core Databite packages:
+
+```bash
+npm install @databite/build @databite/flow @databite/types
+```
+
+For additional functionality, install the packages you need:
+
+```bash
+# For React UI components
+npm install @databite/connect
+
+# For pre-built connectors
+npm install @databite/connectors
+
+# For data synchronization
+npm install @databite/engine
+
+# For AI-powered connector generation
+npm install @databite/ai
+```
+
+## Your First Connector
+
+Let's create a simple connector for a hypothetical API service:
+
+```typescript
+import { createConnector, createAction } from "@databite/build";
+import { createFlow } from "@databite/flow";
+import { z } from "zod";
+
+// Define configuration schemas
+const integrationConfig = z.object({
+  apiKey: z.string(),
+  baseUrl: z.string().url(),
+});
+
+const connectionConfig = z.object({
+  accessToken: z.string(),
+  userId: z.string(),
+});
+
+// Create authentication flow
+const authFlow = createFlow("authenticate")
+  .form("getCredentials", {
+    title: "API Authentication",
+    fields: [
+      { name: "apiKey", label: "API Key", type: "password", required: true },
+      { name: "baseUrl", label: "Base URL", type: "url", required: true },
+    ],
+  })
+  .http("validateCredentials", {
+    url: (input) => `${input.getCredentials.baseUrl}/auth/validate`,
+    method: "POST",
+    headers: { Authorization: `Bearer ${input.getCredentials.apiKey}` },
+    returnType: { accessToken: "", userId: "" },
+  })
+  .returns((context) => ({
+    accessToken: context.validateCredentials.accessToken,
+    userId: context.validateCredentials.userId,
+  }));
+
+// Create the connector
+const myConnector = createConnector()
+  .withIdentity("my-service", "My Service")
+  .withVersion("1.0.0")
+  .withAuthor("Your Name")
+  .withDescription("Connector for My Service API")
+  .withIntegrationConfig(integrationConfig)
+  .withConnectionConfig(connectionConfig)
+  .withAuthenticationFlow(authFlow)
+  .withActions({
+    getUser: createAction({
+      label: "Get User",
+      description: "Fetch user information by ID",
+      inputSchema: z.object({ id: z.string() }),
+      outputSchema: z.object({
+        id: z.string(),
+        name: z.string(),
+        email: z.string(),
+      }),
+      handler: async (params, connection) => {
+        const response = await fetch(
+          `${connection.config.baseUrl}/users/${params.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${connection.config.accessToken}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+      },
+    }),
+  })
+  .build();
+```
+
+## Using Your Connector
+
+### Create an Integration
+
+```typescript
+// Create an integration instance
+const integration = myConnector.createIntegration("My Integration", {
+  apiKey: "your-api-key",
+  baseUrl: "https://api.example.com",
+});
+```
+
+### Create a Connection
+
+```typescript
+// Create a connection (after authentication)
+const connection = {
+  id: "conn-1",
+  integrationId: integration.id,
+  config: {
+    accessToken: "access-token-from-auth",
+    userId: "user-123",
+  },
+  status: "active",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+```
+
+### Execute Actions
+
+```typescript
+// Execute an action
+const result = await myConnector.actions.getUser.handler(
+  { id: "user-123" },
+  connection
+);
+
+console.log(result); // { id: "user-123", name: "John Doe", email: "john@example.com" }
+```
+
+## React Integration
+
+If you're building a React application, use the Connect components:
+
+```tsx
+import { ConnectModal } from "@databite/connect";
+import { useState } from "react";
+
+function MyComponent() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <ConnectModal
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      integration={integration}
+      onAuthSuccess={(integration, config) => {
+        console.log("Authentication successful:", config);
+        // Save connection to your backend
+      }}
+    />
+  );
+}
+```
+
+## Data Synchronization
+
+Set up automatic data synchronization:
+
+```typescript
+import { DatabiteEngine } from "@databite/engine";
+
+const engine = new DatabiteEngine({
+  dataProvider: async () => ({
+    connections: [connection],
+    integrations: [integration],
+  }),
+  dataExporter: async ({ connections, integrations }) => {
+    // Save data to your database
+    console.log("Synced data:", { connections, integrations });
+    return { success: true, error: null };
+  },
+  schedulerAdapter: new BullMQAdapter(),
+  minutesBetweenSyncs: 5,
+});
+
+// Start the engine
+engine.start();
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore Packages" icon="book" href="/packages/types">
+    Learn about each package in detail
+  </Card>
+  <Card
+    title="Build Custom Connectors"
+    icon="wrench"
+    href="/guides/custom-connectors"
+  >
+    Create more complex connectors with advanced features
+  </Card>
+  <Card title="AI Connector Generation" icon="robot" href="/packages/ai">
+    Generate connectors automatically from API documentation
+  </Card>
+  <Card title="Example Web App" icon="code" href="/examples/webapp">
+    See a complete implementation example
+  </Card>
+</CardGroup>
