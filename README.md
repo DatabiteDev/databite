@@ -1,5 +1,9 @@
 # Databite SDK
 
+<div align="center">
+  <img src="docs/images/hero.png" alt="Databite SDK Hero" width="800" />
+</div>
+
 A comprehensive TypeScript SDK for building, managing, and executing connectors to third-party APIs. The Databite SDK provides a powerful, type-safe way to create integrations with external services, manage data synchronization, and build robust data pipelines.
 
 ## 🏗️ Architecture
@@ -207,6 +211,12 @@ pnpm release
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📋 Code of Conduct
+
+This project adheres to a Code of Conduct to ensure a welcoming and inclusive environment for all contributors and community members. We are committed to providing a harassment-free experience for everyone, regardless of background, identity, or experience level.
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) to understand our community guidelines and expectations for participation.
 
 ## 📄 License
 
