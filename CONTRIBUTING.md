@@ -188,7 +188,7 @@ Brief description of what this PR does.
 
 ### Getting Help
 
-- 💬 [Discord Community](https://discord.gg/databite) - Real-time chat and support
+- 💬 [Discord Community](https://discord.gg/5HZXYMdNST) - Real-time chat and support
 - 🐛 [GitHub Issues](https://github.com/DatabiteDev/databite/issues) - Bug reports and feature requests
 - 📖 [Documentation](https://docs.databite.dev) - Comprehensive guides and API docs
 - 📧 [Email](mailto:hello@databite.dev) - Direct contact for sensitive matters

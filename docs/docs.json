@@ -78,7 +78,7 @@
         },
         {
           "anchor": "Discord",
-          "href": "https://discord.gg/databite",
+          "href": "https://discord.gg/5HZXYMdNST",
           "icon": "discord"
         }
       ]
@@ -115,9 +115,11 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/databite",
+      "x": "https://x.com/databite_dev",
       "github": "https://github.com/DatabiteDev/databite",
-      "linkedin": "https://www.linkedin.com/company/databite"
+      "linkedin": "https://www.linkedin.com/company/databite-dev",
+      "discord": "https://discord.gg/5HZXYMdNST",
+      "youtube": "https://www.youtube.com/channel/UCiEYSo3kDO_TFRM2ObpalTA"
     }
   }
 }

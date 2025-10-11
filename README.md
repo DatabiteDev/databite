@@ -225,6 +225,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 - 📖 [Documentation](https://docs.databite.dev)
-- 💬 [Discord Community](https://discord.gg/databite)
+- 💬 [Discord Community](https://discord.gg/5HZXYMdNST)
 - 🐛 [Issue Tracker](https://github.com/DatabiteDev/databite/issues)
 - 📧 [Email Support](mailto:hello@databite.dev)
