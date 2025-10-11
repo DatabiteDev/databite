@@ -17,7 +17,6 @@ databite/
 │   ├── flow/           # Flow engine for complex workflows
 │   ├── types/          # Shared TypeScript types
 │   └── example-webapp/ # Example Next.js web application
-└── webapp/             # Example web application (legacy)
 ```
 
 ## 📦 Packages
