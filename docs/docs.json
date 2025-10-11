@@ -73,7 +73,7 @@
       "anchors": [
         {
           "anchor": "GitHub",
-          "href": "https://github.com/databite/databite",
+          "href": "https://github.com/DatabiteDev/databite",
           "icon": "github"
         },
         {
@@ -92,13 +92,13 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@databite.com"
+        "href": "mailto:hello@databite.dev"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Get Started",
-      "href": "https://databite.com/sign-up"
+      "href": "https://databite.dev/sign-up"
     }
   },
   "contextual": {
@@ -116,7 +116,7 @@
   "footer": {
     "socials": {
       "x": "https://x.com/databite",
-      "github": "https://github.com/databite",
+      "github": "https://github.com/DatabiteDev/databite",
       "linkedin": "https://www.linkedin.com/company/databite"
     }
   }

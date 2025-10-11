@@ -123,7 +123,7 @@ const myConnector = createConnector()
 
 ```bash
 # Clone the repository
-git clone https://github.com/databite/databite.git
+git clone https://github.com/DatabiteDev/databite.git
 cd databite
 
 # Install dependencies
@@ -215,7 +215,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-- 📖 [Documentation](https://docs.databite.com)
+- 📖 [Documentation](https://docs.databite.dev)
 - 💬 [Discord Community](https://discord.gg/databite)
-- 🐛 [Issue Tracker](https://github.com/databite/databite/issues)
-- 📧 [Email Support](mailto:support@databite.com)
+- 🐛 [Issue Tracker](https://github.com/DatabiteDev/databite/issues)
+- 📧 [Email Support](mailto:hello@databite.dev)

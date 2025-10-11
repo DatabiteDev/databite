@@ -1136,6 +1136,6 @@ We welcome contributions! Please see our [Contributing Guide](../../CONTRIBUTING
 
 ## 📞 Support
 
-- [GitHub Issues](https://github.com/databite/builder/issues) - Bug reports and feature requests
-- [Discussions](https://github.com/databite/builder/discussions) - Community discussions and questions
-- [Documentation](https://docs.databite.com) - Full documentation and guides
+- [GitHub Issues](https://github.com/DatabiteDev/databite/issues) - Bug reports and feature requests
+- [Discussions](https://github.com/DatabiteDev/databite/discussions) - Community discussions and questions
+- [Documentation](https://docs.databite.dev) - Full documentation and guides
