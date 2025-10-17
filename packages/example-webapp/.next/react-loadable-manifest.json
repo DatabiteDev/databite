@@ -1,8 +1,0 @@
-{
-  "..\\..\\node_modules\\.pnpm\\next@15.5.4_@opentelemetry+_bc8e32fbd94987feae02e5cacd7c3d48\\node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts": {
-    "id": "..\\..\\node_modules\\.pnpm\\next@15.5.4_@opentelemetry+_bc8e32fbd94987feae02e5cacd7c3d48\\node_modules\\next\\dist\\client\\dev\\hot-reloader\\app\\use-websocket.js -> @vercel/turbopack-ecmascript-runtime/browser/dev/hmr-client/hmr-client.ts",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pnpm_next_15_5_4__opentelemetry__bc8e32fbd94987feae02e5cacd7c-33d950.js"
-    ]
-  }
-}
