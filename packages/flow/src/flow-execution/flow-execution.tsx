@@ -17,15 +17,18 @@ import { useHydratedFlow } from "./flow-hydration";
  */
 export function useFlowExecution<
   FlowReturnType extends z.ZodType,
-  TBlocks extends Record<string, FlowBlock<any, any>>
->(flow: Flow<FlowReturnType, TBlocks>) {
-  // Auto-hydrate the flow
+  TBlocks extends Record<string, FlowBlock<any, any>>,
+  TInitialContext extends Record<string, any> = {}
+>(
+  flow: Flow<FlowReturnType, TBlocks, TInitialContext>,
+  initialContext: TInitialContext
+) {
   const hydratedFlow = useHydratedFlow(flow);
 
   const [state, setState] = useState<FlowState>(() => {
     const blockEntries = hydratedFlow.blockOrder
       ? hydratedFlow.blockOrder.map(
-          (name) => [name, hydratedFlow.blocks[name]] as const
+          (name: string) => [name, hydratedFlow.blocks[name]] as const
         )
       : Object.entries(hydratedFlow.blocks);
 
@@ -35,7 +38,7 @@ export function useFlowExecution<
       currentBlockName: blockEntries[0]?.[0] as string,
       isExecuting: false,
       isComplete: false,
-      context: {},
+      context: initialContext,
       steps: [],
       startTime: Date.now(),
     };
@@ -43,7 +46,7 @@ export function useFlowExecution<
 
   const blockEntries = hydratedFlow.blockOrder
     ? hydratedFlow.blockOrder.map(
-        (name) => [name, hydratedFlow.blocks[name]] as const
+        (name: string) => [name, hydratedFlow.blocks[name]] as const
       )
     : Object.entries(hydratedFlow.blocks);
 
@@ -107,7 +110,7 @@ export function useFlowExecution<
         isComplete: true,
       }));
     }
-  }, [state, currentBlock, blockEntries]);
+  }, [currentBlock, blockEntries]);
 
   /**
    * Handle completion from an interactive block.
@@ -143,7 +146,7 @@ export function useFlowExecution<
         isComplete: isLastStep,
       }));
     },
-    [state, currentBlock, blockEntries]
+    [currentBlock, blockEntries]
   );
 
   /**
@@ -259,8 +262,6 @@ export function useFlowExecution<
 
 /**
  * Wrapper component that properly handles block rendering with hooks.
- * This prevents "rendered fewer hooks" errors by ensuring each block render
- * gets its own stable component instance.
  */
 function BlockRenderer({
   block,
@@ -275,14 +276,9 @@ function BlockRenderer({
 }) {
   if (!block.render) {
     return (
-      <div className="p-4 rounded">
+      <div className="p-6 rounded flex items-center justify-center">
         <div className="flex flex-col items-center justify-center gap-4">
-          <div className="animate-spin h-8 w-8 border-4 border-black/30 border-t-transparent rounded-full" />
-          {block.description && (
-            <div className="text-muted-foreground text-sm mt-1">
-              {block.description}
-            </div>
-          )}
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
       </div>
     );
@@ -300,9 +296,11 @@ export function FlowRenderer<
   TBlocks extends Record<string, FlowBlock<any, any>>
 >({
   flow,
+  initialContext,
   onComplete,
 }: {
   flow: Flow<FlowReturnType, TBlocks>;
+  initialContext: Record<string, any>;
   onComplete?: (result: FlowExecutionResult<z.infer<FlowReturnType>>) => void;
 }) {
   const {
@@ -312,7 +310,7 @@ export function FlowRenderer<
     handleBlockComplete,
     handleBlockError,
     getResult,
-  } = useFlowExecution(flow);
+  } = useFlowExecution(flow, initialContext);
 
   // Auto-proceed for non-interactive blocks
   useEffect(() => {
@@ -326,13 +324,34 @@ export function FlowRenderer<
     if (state.isComplete && onComplete) {
       onComplete(getResult());
     }
-  }, [state.isComplete, onComplete, getResult]);
+  }, [state.isComplete, onComplete]);
 
-  if (state.isComplete || !currentBlock) {
+  if (state.isComplete) {
+    return (
+      <div className="p-6 rounded flex items-center justify-center">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBlock) {
     return <Skeleton className="h-32 w-full" />;
   }
 
   const [, block] = currentBlock;
+
+  // Show loading state for non-interactive blocks that are executing
+  if (state.isExecuting && !block.requiresInteraction) {
+    return (
+      <div className="p-6 rounded flex items-center justify-center">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
 
   // Use BlockRenderer with a key to force remount on block change
   return (

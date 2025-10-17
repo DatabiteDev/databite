@@ -1,7 +1,7 @@
 "use client";
 
 // Export everything (server + client)
-export { createFlow } from "./flow-builder/flow-builder";
+export { createFlow, FlowBuilder } from "./flow-builder/flow-builder";
 export {
   useFlowExecution,
   FlowRenderer,

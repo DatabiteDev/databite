@@ -46,7 +46,6 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
-    "@databite/connectors": "workspace:*",
     "@databite/flow": "workspace:*",
     "@databite/types": "workspace:*",
     "@hookform/resolvers": "^5.2.2",

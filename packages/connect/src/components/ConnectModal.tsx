@@ -6,19 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { connectors } from "@databite/connectors";
 import { FlowRenderer } from "@databite/flow";
-
-/** All connectors */
-const allConnectors = new Map<string, Connector<any, any>>(
-  connectors.map((connector) => [connector.id, connector])
-);
+import { useCallback } from "react";
 
 export interface ConnectModalProps {
   /** Whether the modal is open */
   open: boolean;
   /** Callback when the modal open state changes */
   onOpenChange: (open: boolean) => void;
+  /**Connector */
+  connector: Connector<any, any>;
   /** Integration to display */
   integration: Integration<any>;
   /** Callback when authentication is successful */
@@ -33,14 +30,28 @@ export interface ConnectModalProps {
 export function ConnectModal({
   open,
   onOpenChange,
+  connector,
   integration,
   onAuthSuccess,
   onAuthError,
 }: ConnectModalProps) {
-  const connector = allConnectors.get(integration.connectorId);
-  if (!connector || !connector.authenticationFlow) {
+  if (
+    connector.id !== integration.connectorId ||
+    !connector.authenticationFlow
+  ) {
     throw new Error(`Connector ${integration.connectorId} not found`);
   }
+
+  const handleComplete = useCallback(
+    (result: any) => {
+      if (result.success) {
+        onAuthSuccess(integration, result.data);
+      } else {
+        onAuthError?.(new Error(result.error));
+      }
+    },
+    [onAuthSuccess, onAuthError, integration]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,13 +72,8 @@ export function ConnectModal({
           />
           <FlowRenderer
             flow={connector.authenticationFlow}
-            onComplete={(result) => {
-              if (result.success) {
-                onAuthSuccess(integration, result.data);
-              } else {
-                onAuthError?.(new Error(result.error));
-              }
-            }}
+            initialContext={{ integration: integration.config }}
+            onComplete={handleComplete}
           />
         </div>
       </DialogContent>

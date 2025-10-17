@@ -94,6 +94,9 @@ importers:
 
   packages/build:
     dependencies:
+      '@databite/flow':
+        specifier: workspace:*
+        version: link:../flow
       '@databite/types':
         specifier: workspace:*
         version: link:../types
@@ -137,9 +140,6 @@ importers:
 
   packages/connect:
     dependencies:
-      '@databite/connectors':
-        specifier: workspace:*
-        version: link:../connectors
       '@databite/flow':
         specifier: workspace:*
         version: link:../flow
@@ -267,9 +267,6 @@ importers:
       '@databite/build':
         specifier: workspace:*
         version: link:../build
-      '@databite/flow':
-        specifier: workspace:*
-        version: link:../flow
       '@databite/types':
         specifier: workspace:*
         version: link:../types

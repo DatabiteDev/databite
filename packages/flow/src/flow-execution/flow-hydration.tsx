@@ -16,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { createOAuthRender } from "./handle-oauth-flow";
 
 /**
  * Auto-hydrate flow blocks with render functions based on renderConfig
@@ -67,6 +68,8 @@ function createRenderFunction(renderConfig: {
       return createConfirmRender(config);
     case "display":
       return createDisplayRender(config);
+    case "oauth":
+      return createOAuthRender(config);
     default:
       return () => null;
   }

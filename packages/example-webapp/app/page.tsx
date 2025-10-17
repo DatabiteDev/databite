@@ -11,9 +11,10 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [integration, setIntegration] = useState<Integration<any> | null>(null);
   const myIntegration = slack.createIntegration("Slack", {
-    clientId: "",
-    clientSecret: "",
-    redirectUri: "",
+    clientId: "9697376702562.9705399819652",
+    clientSecret: "169ebd83a73170b3ead63afa7e536f30",
+    redirectUri: "https://abd7e6b4bd73.ngrok-free.app/",
+    scopes: ["chat:write", "channels:read", "users:read", "team:read"],
   });
   const [connectors, setConnectors] = useState<
     {
@@ -44,7 +45,7 @@ export default function App() {
   };
 
   const handleAuthError = (error: Error) => {
-    console.error("Authentication failed:", error);
+    console.log("Authentication failed:", error);
   };
 
   const handleConnect = (integration: Integration<any>) => {
@@ -70,6 +71,7 @@ export default function App() {
           <ConnectModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
+            connector={slack}
             integration={integration}
             onAuthSuccess={handleAuthSuccess}
             onAuthError={handleAuthError}

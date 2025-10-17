@@ -57,7 +57,6 @@
   "dependencies": {
     "@databite/types": "workspace:*",
     "@databite/build": "workspace:*",
-    "@databite/flow": "workspace:*",
     "zod": "^4.1.11"
   },
   "peerDependencies": {

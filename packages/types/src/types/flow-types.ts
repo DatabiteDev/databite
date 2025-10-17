@@ -50,7 +50,8 @@ export interface Flow<
   TBlocks extends Record<string, FlowBlock<z.ZodType, z.ZodType>> = Record<
     string,
     FlowBlock<z.ZodType, z.ZodType>
-  >
+  >,
+  _TInitialContext = {}
 > {
   /** The name of this flow */
   name: string;

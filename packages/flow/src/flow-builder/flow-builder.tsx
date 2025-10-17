@@ -2,7 +2,7 @@ import type { Flow, FlowBlock } from "@databite/types";
 import { z } from "zod";
 
 /**
- * Server-safe flow builder - no React dependencies
+ * Flow builder for creating flows with automatic type inference.
  */
 export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
   private name: string;
@@ -13,7 +13,7 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
     label: string;
     description?: string;
     renderConfig?: {
-      type: "form" | "confirm" | "display" | "custom";
+      type: "form" | "confirm" | "display" | "oauth" | "custom";
       config: any;
     };
   }> = [];
@@ -21,6 +21,20 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
 
   constructor(name: string) {
     this.name = name;
+  }
+
+  // Set initial context TYPE (not value)
+  withInitialContext<TName extends string, TInitialContext>(
+    _name: TName
+  ): FlowBuilder<FlowReturnType, TContext & { [K in TName]: TInitialContext }> {
+    const builder = new FlowBuilder<
+      FlowReturnType,
+      TContext & { [K in TName]: TInitialContext }
+    >(this.name);
+
+    builder.blockDefs = [...this.blockDefs];
+    builder.returnTransform = this.returnTransform as any;
+    return builder;
   }
 
   /**
@@ -155,6 +169,46 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
   }
 
   /**
+   * Add an OAuth redirect block.
+   */
+  oauth<TName extends string, TOutput extends Record<string, any>>(
+    name: TName,
+    config: {
+      authUrl: string | ((context: TContext) => string);
+      title?: string;
+      description?: string;
+      buttonLabel?: string;
+      popupWidth?: number;
+      popupHeight?: number;
+      timeout?: number;
+      extractParams?: (url: URL) => TOutput;
+    }
+  ): FlowBuilder<FlowReturnType, TContext & { [K in TName]: TOutput }> {
+    const run = async () => {
+      throw new Error("OAuth blocks should use onComplete() instead of run()");
+    };
+
+    return this.block<TName, TOutput>(name, run, {
+      requiresInteraction: true,
+      label: config.title || "Authenticate",
+      description: config.description,
+      renderConfig: {
+        type: "oauth",
+        config: {
+          authUrl: config.authUrl,
+          title: config.title,
+          description: config.description,
+          buttonLabel: config.buttonLabel || "Connect",
+          popupWidth: config.popupWidth || 600,
+          popupHeight: config.popupHeight || 700,
+          timeout: config.timeout || 300000, // 5 minutes default
+          extractParams: config.extractParams,
+        },
+      },
+    });
+  }
+
+  /**
    * Add an HTTP request block.
    */
   http<TName extends string, TOutput extends Record<string, any>>(
@@ -163,22 +217,17 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
       url: string | ((input: TContext) => string);
       returnType: TOutput;
       method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-      headers?:
-        | Record<string, string>
-        | ((input: TContext) => Record<string, string>);
-      body?: Record<string, any> | ((input: TContext) => Record<string, any>);
+      headers: (input: TContext) => Record<string, string>;
+      body: (input: TContext) => any;
       timeout?: number;
     }
   ): FlowBuilder<FlowReturnType, TContext & { [K in TName]: TOutput }> {
     const run = async (input: TContext) => {
       const url =
         typeof config.url === "function" ? config.url(input) : config.url;
-      const headers =
-        typeof config.headers === "function"
-          ? config.headers(input)
-          : config.headers;
-      const body =
-        typeof config.body === "function" ? config.body(input) : config.body;
+
+      const headers = config.headers(input);
+      const body = config.body(input);
 
       const { method = "GET", timeout = 30000 } = config;
       const controller = new AbortController();
@@ -187,11 +236,8 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
       try {
         const response = await fetch(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            ...headers,
-          },
-          ...(body && { body: JSON.stringify(body) }),
+          headers,
+          body, // ✅ passed directly as provided
           signal: controller.signal,
         });
 
@@ -199,7 +245,17 @@ export class FlowBuilder<FlowReturnType extends z.ZodType, TContext = {}> {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        return (await response.json()) as TOutput;
+        // Auto-handle response content type
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          return (await response.json()) as TOutput;
+        } else if (contentType.includes("text/")) {
+          const text = await response.text();
+          return text as unknown as TOutput;
+        } else {
+          const blob = await response.blob();
+          return blob as unknown as TOutput;
+        }
       } finally {
         clearTimeout(timeoutId);
       }
