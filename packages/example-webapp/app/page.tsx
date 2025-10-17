@@ -11,9 +11,9 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [integration, setIntegration] = useState<Integration<any> | null>(null);
   const myIntegration = slack.createIntegration("Slack", {
-    clientId: "9697376702562.9705399819652",
-    clientSecret: "169ebd83a73170b3ead63afa7e536f30",
-    redirectUri: "https://abd7e6b4bd73.ngrok-free.app/",
+    clientId: process.env.NEXT_PUBLIC_SLACK_CLIENT_ID!,
+    clientSecret: process.env.SLACK_CLIENT_SECRET!,
+    redirectUri: process.env.NEXT_PUBLIC_SLACK_REDIRECT_URI!,
     scopes: ["chat:write", "channels:read", "users:read", "team:read"],
   });
   const [connectors, setConnectors] = useState<

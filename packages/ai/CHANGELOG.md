@@ -1,5 +1,13 @@
 # @databite/ai
 
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [e9e3bdf]
+  - @databite/types@2.1.0
+  - @databite/build@1.1.1
+
 ## 1.1.0
 
 ### Minor Changes

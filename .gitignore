@@ -15,6 +15,7 @@ dist/
 dist-ssr/
 build/
 *.tsbuildinfo
+.turbo/
 
 # Local files
 *.local

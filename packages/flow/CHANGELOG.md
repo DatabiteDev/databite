@@ -1,5 +1,16 @@
 # @databite/flow
 
+## 2.1.0
+
+### Minor Changes
+
+- e9e3bdf: Fixed Oauth flow, Removed unfinished Trello Connector.
+
+### Patch Changes
+
+- Updated dependencies [e9e3bdf]
+  - @databite/types@2.1.0
+
 ## 2.0.0
 
 ### Major Changes

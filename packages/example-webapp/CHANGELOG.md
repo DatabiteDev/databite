@@ -1,5 +1,22 @@
 # example-webapp
 
+## 0.3.0
+
+### Minor Changes
+
+- e9e3bdf: Fixed Oauth flow, Removed unfinished Trello Connector.
+
+### Patch Changes
+
+- Updated dependencies [e9e3bdf]
+  - @databite/connectors@2.1.0
+  - @databite/connect@1.2.0
+  - @databite/engine@1.2.0
+  - @databite/types@2.1.0
+  - @databite/flow@2.1.0
+  - @databite/ai@1.1.1
+  - @databite/build@1.1.1
+
 ## 0.2.0
 
 ### Minor Changes
