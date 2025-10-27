@@ -1,34 +1,38 @@
 # @databite/example-webapp
 
-A comprehensive example Next.js web application demonstrating the Databite SDK in action. This application showcases how to integrate connectors, manage connections, and build data synchronization workflows using the Databite SDK.
+A minimal example Next.js web application demonstrating how to use the **Databite SDK** to display available connectors, start authentication flows, and manage connections via server actions.
 
-## 📦 Package Structure
+This project shows how to:
+
+- Fetch connectors and integrations from a Databite backend
+- Display them in a simple UI
+- Trigger authentication using the `@databite/connect` modal
+- Store successful connections back to the server
+
+---
+
+## 📦 Project Structure
 
 ```
 example-webapp/
-├── app/                    # Next.js app directory
-│   ├── favicon.ico
-│   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/             # React components
-├── lib/                    # Utility functions
-│   └── utils.ts
-├── __tests__/              # Test files
-│   ├── App.test.tsx
-│   ├── setup.ts
-│   └── utils.test.ts
+├── app/
+│   ├── actions.ts          # Server actions for API requests (fetch connectors, integrations, flows, etc.)
+│   ├── page.tsx            # Main UI that lists connectors and launches ConnectModal
+│   ├── layout.tsx          # Root layout (shared app shell)
+│   └── globals.css         # Global styles
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 └── README.md
 ```
 
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js >= 16.0.0
+- Node.js **>= 18.0.0**
 - npm, yarn, pnpm, or bun
 
 ### Installation
@@ -36,16 +40,17 @@ example-webapp/
 ```bash
 # Install dependencies
 npm install
-
-# Or with other package managers
+# or
 yarn install
+# or
 pnpm install
+# or
 bun install
 ```
 
 ### Development
 
-Start the development server:
+Start the Next.js development server:
 
 ```bash
 npm run dev
@@ -57,198 +62,129 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 🎯 Features
+---
 
-This example application demonstrates:
-
-- **Connector Integration**: How to integrate with various third-party APIs
-- **Authentication Flows**: OAuth and API key authentication patterns
-- **Data Synchronization**: Real-time and scheduled data sync operations
-- **UI Components**: Pre-built React components for connection management
-- **Flow Execution**: Interactive workflows for complex operations
-- **Error Handling**: Robust error handling and user feedback
-- **Type Safety**: Full TypeScript integration with the Databite SDK
-
-## 📚 Usage Examples
-
-### Basic Connector Setup
-
-```typescript
-import { ConnectModal } from "@databite/connect";
-import { slackConnector } from "@databite/connectors";
-
-function SlackIntegration() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <ConnectModal
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      integration={slackConnector.createIntegration("My Slack", {
-        clientId: process.env.NEXT_PUBLIC_SLACK_CLIENT_ID,
-        clientSecret: process.env.SLACK_CLIENT_SECRET,
-        redirectUri: `${window.location.origin}/auth/slack/callback`,
-      })}
-      onAuthSuccess={(integration, config) => {
-        console.log("Slack connected:", config);
-        // Save connection to your backend
-      }}
-    />
-  );
-}
-```
-
-### Data Synchronization
-
-```typescript
-import { DatabiteEngine } from "@databite/engine";
-
-const engine = new DatabiteEngine({
-  dataProvider: async () => {
-    // Fetch connections and integrations from your database
-    return {
-      connections: await fetchConnections(),
-      integrations: await fetchIntegrations(),
-    };
-  },
-  dataExporter: async ({ connections, integrations }) => {
-    // Save data to your database
-    await saveConnections(connections);
-    await saveIntegrations(integrations);
-    return { success: true, error: null };
-  },
-  schedulerAdapter: new BullMQAdapter(),
-  minutesBetweenSyncs: 5,
-});
-```
-
-### Flow Execution
-
-```typescript
-import { createFlow, FlowRenderer } from "@databite/flow";
-
-const userOnboardingFlow = createFlow("userOnboarding")
-  .form("getUserInfo", {
-    title: "Welcome! Let's get started",
-    fields: [
-      { name: "name", label: "Full Name", required: true },
-      { name: "email", label: "Email Address", type: "email", required: true },
-    ],
-  })
-  .http("createUser", {
-    url: "/api/users",
-    method: "POST",
-    returnType: { id: "", name: "", email: "" },
-    body: (input) => ({
-      name: input.getUserInfo.name,
-      email: input.getUserInfo.email,
-    }),
-  })
-  .display("showSuccess", {
-    title: "Success!",
-    content: (input) => `Welcome ${input.createUser.name}!`,
-  })
-  .build();
-
-function OnboardingPage() {
-  return (
-    <FlowRenderer
-      flow={userOnboardingFlow}
-      onComplete={(result) => {
-        console.log("Onboarding completed:", result.data);
-      }}
-    />
-  );
-}
-```
-
-## 🔧 Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
-Create a `.env.local` file in the root directory:
+Create a `.env.local` file at the root of your project:
 
 ```bash
-# Slack Integration
-NEXT_PUBLIC_SLACK_CLIENT_ID=your-slack-client-id
-SLACK_CLIENT_SECRET=your-slack-client-secret
-
-# Trello Integration
-NEXT_PUBLIC_TRELLO_API_KEY=your-trello-api-key
-TRELLO_API_TOKEN=your-trello-api-token
-
-# Database
-DATABASE_URL=your-database-url
-
-# Authentication
-NEXTAUTH_SECRET=your-nextauth-secret
-NEXTAUTH_URL=http://localhost:3000
+# Base URL for your Databite API server
+NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-### Database Setup
+If not provided, the application defaults to `http://localhost:3001`.
 
-This example uses Prisma for database management:
+---
 
-```bash
-# Generate Prisma client
-npx prisma generate
+## 🎯 Features Demonstrated
 
-# Run database migrations
-npx prisma db push
+- **Server Actions** (`actions.ts`)
 
-# Seed the database
-npx prisma db seed
+  - Fetch integrations, connectors, and connections from an API
+  - Add and remove connections
+  - Manage flow sessions (start, step, and fetch)
+  - Handle API errors gracefully
+
+- **Client App** (`page.tsx`)
+  - Fetch all available integrations with their connector metadata
+  - Display a clickable list of integrations
+  - Open a `ConnectModal` from `@databite/connect` for authentication
+  - Handle success and error callbacks
+  - Persist connection data through the backend
+
+---
+
+## 🧩 Key Components
+
+### `ConnectModal` Usage
+
+The app uses the `ConnectModal` from `@databite/connect` to handle OAuth or API key authentication for each integration.
+
+```tsx
+<ConnectModal
+  open={isModalOpen}
+  onOpenChange={setIsModalOpen}
+  integrationId={integration.integration.id}
+  baseUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}
+  onAuthSuccess={handleAuthSuccess}
+  onAuthError={handleAuthError}
+/>
 ```
 
-## 🧪 Testing
+When authentication succeeds, the returned connection object is saved via `addConnection()`.
 
-Run the test suite:
+---
 
-```bash
-# Run all tests
-npm test
+## 🧠 Example Flow
 
-# Run tests in watch mode
-npm run test:watch
+1. The app loads all **connectors** and **integrations** from the backend using:
+   ```ts
+   const integrations = await getIntegrationsWithConnectors();
+   ```
+2. Each integration is displayed in the UI with its name and logo.
+3. When a user clicks an integration:
+   - The `ConnectModal` opens.
+   - The authentication flow begins.
+4. On success:
+   - The `connection` object is saved to the backend with `addConnection()`.
+   - All existing connections can be fetched with `getConnections()`.
 
-# Run tests with coverage
-npm run test:coverage
-```
+---
+
+## 🔍 API Endpoints Used (Backend Expected)
+
+| Endpoint                     | Method   | Description                 |
+| ---------------------------- | -------- | --------------------------- |
+| `/api/integrations`          | GET      | Fetch all integrations      |
+| `/api/integrations/:id`      | GET      | Fetch a single integration  |
+| `/api/connectors`            | GET      | Fetch all connectors        |
+| `/api/connectors/:id`        | GET      | Fetch a single connector    |
+| `/api/connections`           | GET/POST | Get or create connections   |
+| `/api/connections/:id`       | DELETE   | Remove a connection         |
+| `/api/flows/start`           | POST     | Start a flow session        |
+| `/api/flows/:sessionId/step` | POST     | Execute a flow step         |
+| `/api/flows/:sessionId`      | GET      | Retrieve flow session state |
+| `/api/health`                | GET      | Health check endpoint       |
+
+---
+
+## 🧪 Example Screens
+
+**Main Screen:** Displays a list of integrations (with connector logos).
+
+**Connect Modal:** Opens Databite’s built-in authentication UI for that integration.
+
+---
 
 ## 🚀 Deployment
 
-### Vercel (Recommended)
+This example can be deployed anywhere that supports Next.js:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new):
+- **Vercel** (recommended)
+- **Netlify**
+- **Railway**
+- **Docker**
+- **AWS / GCP / Azure**
 
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Set your environment variables in the Vercel dashboard
-4. Deploy!
+---
 
-### Other Platforms
+## 🧭 Learn More
 
-This application can be deployed to any platform that supports Next.js:
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Databite SDK Docs](https://docs.databite.io)
+- [@databite/connect](https://www.npmjs.com/package/@databite/connect)
 
-- **Netlify**: Use the Next.js build command
-- **Railway**: Deploy directly from GitHub
-- **Docker**: Use the included Dockerfile
-- **AWS/GCP/Azure**: Use their respective deployment services
-
-## 📖 Learn More
-
-- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
-- [Databite SDK Documentation](./packages/build/README.md) - Core SDK documentation
-- [Flow Engine Documentation](./packages/flow/README.md) - Flow engine documentation
-- [Connectors Documentation](./packages/connectors/README.md) - Pre-built connectors
-- [Engine Documentation](./packages/engine/README.md) - Data synchronization and execution engine
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](../../CONTRIBUTING.md) for details.
+---
 
 ## 📄 License
 
-MIT License - see [LICENSE](../../LICENSE) for details.
+MIT License — see [LICENSE](../../LICENSE) for details.
+
+```
+
+```

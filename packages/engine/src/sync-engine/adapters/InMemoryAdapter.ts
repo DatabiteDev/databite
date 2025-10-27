@@ -15,9 +15,7 @@ export class InMemoryAdapter implements SchedulerAdapter {
   private timers = new Map<string, NodeJS.Timeout>();
   private engine: SyncEngine | null = null;
 
-  constructor(syncEngine?: SyncEngine) {
-    this.engine = syncEngine || null;
-  }
+  constructor() {}
 
   setSyncEngine(engine: SyncEngine): void {
     this.engine = engine;

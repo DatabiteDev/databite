@@ -1,5 +1,6 @@
 import { Connection, Connector, Integration } from "@databite/types";
 import { IntegrationRateLimiter } from "../rate-limiter/rate-limiter";
+import { SyncEngine } from "./engine";
 
 /**
  * Represents the result of executing a sync operation.
@@ -38,6 +39,11 @@ export interface SyncJobData {
  * Interface that all scheduler adapters must implement
  */
 export interface SchedulerAdapter {
+  /**
+   * Set the sync engine
+   */
+  setSyncEngine(engine: SyncEngine): void;
+
   /**
    * Initialize the adapter
    */

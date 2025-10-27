@@ -8,6 +8,7 @@ import {
 } from "../sync-engine/types";
 import { IntegrationRateLimiter } from "../rate-limiter/rate-limiter";
 import { ActionExecutor } from "../action-executer/action-executer";
+import { FlowSessionManager } from "../flow-manager/flow-session-manager";
 
 /**
  * Provider method for fetching connections and integrations
@@ -47,6 +48,7 @@ export interface EngineConfig {
 export class DatabiteEngine {
   private syncEngine: SyncEngine;
   private actionExecutor: ActionExecutor;
+  private flowSessionManager: FlowSessionManager;
   private dataProvider: DataProvider | undefined;
   private dataExporter: DataExporter | undefined;
   private refreshInterval: number;
@@ -90,6 +92,9 @@ export class DatabiteEngine {
       rateLimiter: this.rateLimiter,
     });
 
+    // Set the adapters sync engine
+    config.schedulerAdapter.setSyncEngine(this.syncEngine);
+
     // Initialize Action Executor
     this.actionExecutor = new ActionExecutor({
       getConnection: (id) => this.connections.get(id),
@@ -97,6 +102,12 @@ export class DatabiteEngine {
       getConnector: (id) => this.connectors.get(id),
       rateLimiter: this.rateLimiter,
     });
+
+    // Initialize the flow manager
+    this.flowSessionManager = new FlowSessionManager();
+
+    // Start the expired session cleanup
+    this.startSessionCleanup();
 
     // Initialize connections and integrations from data provider
     if (this.dataProvider) {
@@ -147,6 +158,16 @@ export class DatabiteEngine {
         console.error("Failed to refresh data:", err);
       });
     }, this.refreshInterval);
+  }
+
+  /** Clean up expired sessions every 5 minutes*/
+  private startSessionCleanup() {
+    setInterval(() => {
+      const cleaned = this.flowSessionManager.cleanupExpiredSessions();
+      if (cleaned > 0) {
+        console.log(`Cleaned up ${cleaned} expired flow sessions`);
+      }
+    }, 5 * 60 * 1000);
   }
 
   /**
@@ -328,6 +349,84 @@ export class DatabiteEngine {
     executionTime: number;
   }> {
     return this.actionExecutor.executeAction(connectionId, actionName, params);
+  }
+
+  /**Start a flow session */
+  async startFlowSession(integrationId: string) {
+    const integration = this.getIntegrationById(integrationId);
+    if (!integration) {
+      throw new Error("Integration not found");
+    }
+
+    const connector = this.getConnectorById(integration.connectorId);
+    if (!connector) {
+      throw new Error("Connector not found");
+    }
+
+    if (!connector.authenticationFlow) {
+      throw new Error("No authentication flow available");
+    }
+
+    // Create session with integration config as initial context
+    const sessionId = this.flowSessionManager.createSession(
+      connector.id,
+      connector,
+      {
+        integration: integration.config,
+        integrationId: integration.id,
+      }
+    );
+
+    // Execute first step (might auto-execute non-interactive blocks)
+    const result = await this.flowSessionManager.executeStep(
+      sessionId,
+      connector
+    );
+
+    return result;
+  }
+
+  /**Execute a flow's step */
+  async executeFlowStep(sessionId: string, userInput?: any) {
+    const session = this.flowSessionManager.getSession(sessionId);
+    if (!session) {
+      throw new Error("Flow session not found or expired");
+    }
+
+    // Get connector from session context
+    const connectorId = session.context._connectorId;
+    if (!connectorId) {
+      throw new Error("Invalid session state");
+    }
+
+    const connector = this.getConnectorById(connectorId);
+    if (!connector) {
+      throw new Error("Connector not found");
+    }
+
+    const result = await this.flowSessionManager.executeStep(
+      sessionId,
+      connector,
+      userInput
+    );
+
+    return result;
+  }
+
+  /**Get a flow session */
+  async getFlowSession(sessionId: string) {
+    const session = this.flowSessionManager.getSession(sessionId);
+
+    if (!session) {
+      throw new Error("Flow session not found or expired");
+    }
+
+    return session;
+  }
+
+  /**Delete a flow session */
+  async deleteFlowSession(sessionId: string) {
+    this.flowSessionManager.deleteSession(sessionId);
   }
 
   /**

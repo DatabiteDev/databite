@@ -1,4 +1,3 @@
-// packages/engine/src/rate-limiting/integration-rate-limiter.ts
 export interface RateLimitConfig {
   requests: number;
   windowMs: number;

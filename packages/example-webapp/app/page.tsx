@@ -2,45 +2,52 @@
 
 import React, { useState, useEffect } from "react";
 import { ConnectModal } from "@databite/connect";
-import { slack } from "@databite/connectors";
-import { Integration } from "@databite/types";
-import { Button } from "@/components/ui/button";
-import { getConnectors } from "./server-action";
+import { Integration, Connection } from "@databite/types";
+import {
+  getIntegrationsWithConnectors,
+  addConnection,
+  getConnections,
+} from "./actions";
+
+type ConnectorMetadata = {
+  id: string;
+  name: string;
+  description?: string;
+  logo?: string;
+  documentationUrl?: string;
+  version: string;
+  author?: string;
+  tags?: string[];
+  categories: any[];
+  actions: any[];
+  syncs: any[];
+};
+
+type IntegrationsWithConnector = {
+  connector: ConnectorMetadata;
+  integration: Integration<any>;
+};
 
 export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [integration, setIntegration] = useState<Integration<any> | null>(null);
-  const myIntegration = slack.createIntegration("Slack", {
-    clientId: process.env.NEXT_PUBLIC_SLACK_CLIENT_ID!,
-    clientSecret: process.env.SLACK_CLIENT_SECRET!,
-    redirectUri: process.env.NEXT_PUBLIC_SLACK_REDIRECT_URI!,
-    scopes: ["chat:write", "channels:read", "users:read", "team:read"],
-  });
-  const [connectors, setConnectors] = useState<
-    {
-      id: string;
-      name: string;
-      logo: string | undefined;
-    }[]
-  >([]);
+  const [integration, setIntegration] =
+    useState<IntegrationsWithConnector | null>(null);
+  const [integrations, setIntegrations] = useState<IntegrationsWithConnector[]>(
+    []
+  );
 
   useEffect(() => {
-    const fetchConnectors = async () => {
-      const connectors = await getConnectors();
-      console.log(connectors);
-      setConnectors(connectors);
+    const fetchIntegrations = async () => {
+      const integrations = await getIntegrationsWithConnectors();
+      setIntegrations(integrations);
     };
-    fetchConnectors();
+    fetchIntegrations();
   }, []);
 
-  const handleAuthSuccess = async (
-    integration: Integration<any>,
-    connectionConfig: any
-  ) => {
-    console.log("Authentication successful:", {
-      integration,
-      connectionConfig,
-    });
+  const handleAuthSuccess = async (connection: Connection<any>) => {
+    console.log("Authentication successful:", connection);
+    await addConnection(connection);
+    console.log(await getConnections());
     setIsModalOpen(false);
   };
 
@@ -48,7 +55,7 @@ export default function App() {
     console.log("Authentication failed:", error);
   };
 
-  const handleConnect = (integration: Integration<any>) => {
+  const handleConnect = async (integration: IntegrationsWithConnector) => {
     setIntegration(integration);
     setIsModalOpen(true);
   };
@@ -60,43 +67,37 @@ export default function App() {
           Connect Your Service
         </h1>
 
-        <Button
-          onClick={() => handleConnect(myIntegration)}
-          className="w-full mb-8 py-6 text-lg font-medium cursor-pointer"
-        >
-          Connect to Slack
-        </Button>
-
         {integration && (
           <ConnectModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
-            connector={slack}
-            integration={integration}
+            integrationId={integration.integration.id}
+            baseUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}
             onAuthSuccess={handleAuthSuccess}
             onAuthError={handleAuthError}
           />
         )}
 
-        <div className="border-t border-gray-200 pt-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">
-            Available Connectors
-          </h2>
-          <div className="flex flex-col gap-3">
-            {connectors.map((connector, index) => (
-              <div
-                key={connector.id ?? `${connector.name}-${index}`}
-                className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors"
-              >
-                <img
-                  src={connector.logo}
-                  alt={connector.name}
-                  className="w-8 h-8 rounded object-contain"
-                />
-                <p className="text-gray-800 font-medium">{connector.name}</p>
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-col gap-3">
+          {integrations.map((integration, index) => (
+            <div
+              key={
+                integration.integration.id ??
+                `${integration.integration.name}-${index}`
+              }
+              onClick={() => handleConnect(integration)}
+              className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+            >
+              <img
+                src={integration.connector.logo}
+                alt={integration.integration.name}
+                className="w-8 h-8 rounded object-contain"
+              />
+              <p className="text-gray-800 font-medium">
+                {integration.integration.name}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

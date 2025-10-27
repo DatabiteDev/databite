@@ -6,7 +6,7 @@
   "author": "Databite",
   "packageManager": "pnpm@10.18.1",
   "scripts": {
-    "build:all": "turbo run build --filter=!example-webapp",
+    "build:all": "turbo run build --filter=!example-webapp --filter=!example-server",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build:all && pnpm changeset version && pnpm -r publish"
