@@ -1,5 +1,17 @@
 # example-webapp
 
+## 0.4.0
+
+### Minor Changes
+
+- Added server package
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connect@2.0.0
+  - @databite/types@3.0.0
+
 ## 0.3.0
 
 ### Minor Changes

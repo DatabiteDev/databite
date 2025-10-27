@@ -1,5 +1,17 @@
 # @databite/connectors
 
+## 2.2.0
+
+### Minor Changes
+
+- Added server package
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/build@2.0.0
+  - @databite/types@3.0.0
+
 ## 2.1.0
 
 ### Minor Changes
