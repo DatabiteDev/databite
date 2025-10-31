@@ -85,6 +85,10 @@ export class ActionExecutor {
       const result = await action.handler(params, connection);
       const executionTime = Date.now() - startTime;
 
+      console.log(
+        `Action '${actionName}' for connection '${connectionId}' completed successfully in ${executionTime}ms at ${new Date().toISOString()}`
+      );
+
       return {
         success: true,
         data: result,

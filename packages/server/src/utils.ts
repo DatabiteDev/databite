@@ -1,4 +1,4 @@
-import { Connector, Action, Sync, ConnectorCategory } from "@databite/types";
+import { Connector, ConnectorCategory } from "@databite/types";
 
 // Type for sanitized connector metadata (API-safe)
 export interface ConnectorMetadata {
@@ -41,17 +41,17 @@ export function sanitizeConnector(
     name: connector.name,
     version: connector.version,
     categories: connector.categories,
-    actions: Object.values(connector.actions).map(
-      (action: Action<any, any, any>) => ({
-        id: action.id,
-        label: action.label,
-        description: action.description,
-        maxRetries: action.maxRetries,
-        timeout: action.timeout,
-      })
-    ),
-    syncs: Object.values(connector.syncs).map((sync: Sync<any, any>) => ({
+    actions: Object.entries(connector.actions).map(([key, action]) => ({
+      id: action.id,
+      name: key,
+      label: action.label,
+      description: action.description,
+      maxRetries: action.maxRetries,
+      timeout: action.timeout,
+    })),
+    syncs: Object.entries(connector.syncs).map(([key, sync]) => ({
       id: sync.id,
+      name: key,
       label: sync.label,
       description: sync.description,
       maxRetries: sync.maxRetries,

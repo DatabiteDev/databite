@@ -13,4 +13,6 @@ export interface Connection<TConnectionConfig extends z.ZodType> {
   connectorId: string;
   /** Connector Configuration */
   config: z.infer<TConnectionConfig>;
+  /** Metadata for the connection*/
+  metadata?: Record<string, any>;
 }

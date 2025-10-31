@@ -1,20 +1,11 @@
 import { createConnector } from "@databite/build";
 import { z } from "zod";
-
-const SlackIntegrationConfigSchema = z.object({
-  clientId: z.string(),
-  clientSecret: z.string(),
-  redirectUri: z.string(),
-  scopes: z.array(z.string()),
-});
-
-const SlackConnectionConfigSchema = z.object({
-  workspace: z.string(),
-  userId: z.string(),
-  accessToken: z.string(),
-  teamId: z.string(),
-  teamName: z.string(),
-});
+import {
+  SlackIntegrationConfigSchema,
+  SlackConnectionConfigSchema,
+} from "./schemas";
+import { sendMessage } from "./actions";
+import { fetchMessages } from "./syncs";
 
 export const slack = createConnector<
   typeof SlackIntegrationConfigSchema,
@@ -104,13 +95,14 @@ export const slack = createConnector<
       })
       .returns((ctx) => ctx.result)
   )
-  .withRefresh(async (_connection) => {
-    return {
-      workspace: "",
-      userId: "",
-      accessToken: "",
-      teamId: "",
-      teamName: "",
-    };
+  .withRefresh(async (connection) => {
+    return connection.config;
   })
+  .withRateLimit({
+    requests: 100, // 100 requests per minute
+    windowMs: 60000, // 1 minute
+    strategy: "per-connection", // rate limit per connection
+  })
+  .withActions({ "Send Message": sendMessage })
+  .withSyncs({ "Fetch Messages": fetchMessages })
   .build();

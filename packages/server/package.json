@@ -53,9 +53,11 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@databite/types": "workspace:*",
     "@databite/engine": "workspace:*",
+    "@databite/types": "workspace:*",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.0",
+    "helmet": "^8.1.0",
     "zod": "^4.1.11"
   },
   "peerDependencies": {

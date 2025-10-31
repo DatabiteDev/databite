@@ -98,6 +98,10 @@ export interface SyncEngineConfig {
   getConnection: (id: string) => Connection<any> | undefined;
   getIntegration: (id: string) => Integration<any> | undefined;
   getConnector: (id: string) => Connector<any, any> | undefined;
+  updateConnectionMetadata: (
+    connectionId: string,
+    metadata: Record<string, any>
+  ) => Promise<void>;
   minutesBetweenSyncs: number; // Number of minutes between syncs
   rateLimiter: IntegrationRateLimiter;
 }

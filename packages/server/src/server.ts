@@ -1,96 +1,179 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { DatabiteEngine, EngineConfig } from "@databite/engine";
-import { Action, Connection, Integration } from "@databite/types";
+import { Connection, Integration } from "@databite/types";
 import { sanitizeConnector, sanitizeConnectors } from "./utils";
 import type { StartFlowRequest, ExecuteStepRequest } from "@databite/types";
+import {
+  SecurityMiddleware,
+  SecurityConfig,
+  strictLimiter,
+  moderateLimiter,
+} from "./security";
 
 export interface ServerConfig {
   port: number;
   engineConfig: EngineConfig;
+  security?: SecurityConfig;
 }
 
 export class DatabiteServer {
   private app: Express;
   private engine: DatabiteEngine;
   private port: number;
+  private security: SecurityMiddleware;
 
   constructor(config: ServerConfig) {
     this.app = express();
     this.port = config.port;
     this.engine = new DatabiteEngine(config.engineConfig);
+    this.security = new SecurityMiddleware(config.security);
     this.setupMiddleware();
     this.setupRoutes();
   }
 
   private setupMiddleware() {
-    this.app.use(express.json());
-    // Enable CORS
-    this.app.use((req, res, next) => {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET, POST, PUT, DELETE, OPTIONS"
-      );
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization"
-      );
-      if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-      }
-      return next();
+    // Security headers (helmet)
+    this.app.use(this.security.getHelmet());
+
+    // Request size limits
+    this.app.use(express.json({ limit: "10mb" }));
+    this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+    // CORS with origin validation
+    this.app.use(this.security.getCorsMiddleware());
+
+    // IP filtering
+    this.app.use(this.security.getIpFilter());
+
+    // Global rate limiting
+    this.app.use(this.security.getRateLimiter());
+
+    // Input sanitization
+    this.app.use(this.security.getSanitizer());
+
+    // Request validation
+    this.app.use(this.security.getRequestValidator());
+
+    // Request logging
+    this.app.use((req, _res, next) => {
+      console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+      next();
     });
   }
 
   private setupRoutes() {
-    // Connector routes
-    this.app.get("/api/connectors", this.getConnectors.bind(this));
-    this.app.get("/api/connectors/:id", this.getConnector.bind(this));
+    // Connector routes (read-only, moderate limits)
+    this.app.get(
+      "/api/connectors",
+      moderateLimiter,
+      this.getConnectors.bind(this)
+    );
+    this.app.get(
+      "/api/connectors/:id",
+      moderateLimiter,
+      this.getConnector.bind(this)
+    );
 
-    // Integration routes
-    this.app.get("/api/integrations", this.getIntegrations.bind(this));
-    this.app.get("/api/integrations/:id", this.getIntegration.bind(this));
+    // Integration routes (read-only, moderate limits)
+    this.app.get(
+      "/api/integrations",
+      moderateLimiter,
+      this.getIntegrations.bind(this)
+    );
+    this.app.get(
+      "/api/integrations/:id",
+      moderateLimiter,
+      this.getIntegration.bind(this)
+    );
 
-    // Connection routes
-    this.app.get("/api/connections", this.getConnections.bind(this));
-    this.app.get("/api/connections/:id", this.getConnection.bind(this));
-    this.app.post("/api/connections", this.addConnection.bind(this));
-    this.app.delete("/api/connections/:id", this.removeConnection.bind(this));
+    // Connection routes (write operations, stricter limits)
+    this.app.get(
+      "/api/connections",
+      moderateLimiter,
+      this.getConnections.bind(this)
+    );
+    this.app.get(
+      "/api/connections/:id",
+      moderateLimiter,
+      this.getConnection.bind(this)
+    );
+    this.app.post(
+      "/api/connections",
+      strictLimiter,
+      this.addConnection.bind(this)
+    );
+    this.app.delete(
+      "/api/connections/:id",
+      strictLimiter,
+      this.removeConnection.bind(this)
+    );
 
-    // Flow routes
-    this.app.post("/api/flows/start", this.startFlow.bind(this));
+    // Flow routes (write operations, stricter limits)
+    this.app.post("/api/flows/start", strictLimiter, this.startFlow.bind(this));
     this.app.post(
       "/api/flows/:sessionId/step",
+      moderateLimiter,
       this.executeFlowStep.bind(this)
     );
-    this.app.get("/api/flows/:sessionId", this.getFlowSession.bind(this));
-    this.app.delete("/api/flows/:sessionId", this.deleteFlowSession.bind(this));
+    this.app.get(
+      "/api/flows/:sessionId",
+      moderateLimiter,
+      this.getFlowSession.bind(this)
+    );
+    this.app.delete(
+      "/api/flows/:sessionId",
+      strictLimiter,
+      this.deleteFlowSession.bind(this)
+    );
 
     // Sync routes
-    this.app.get("/api/sync/jobs", this.getScheduledJobs.bind(this));
+    this.app.get(
+      "/api/sync/jobs",
+      moderateLimiter,
+      this.getScheduledJobs.bind(this)
+    );
     this.app.get(
       "/api/sync/jobs/:connectionId",
+      moderateLimiter,
       this.getConnectionJobs.bind(this)
     );
     this.app.post(
       "/api/sync/execute/:connectionId/:syncName",
+      strictLimiter,
       this.executeSync.bind(this)
     );
 
     // Action routes
     this.app.get(
       "/api/actions/:connectorId",
+      moderateLimiter,
       this.getConnectorActions.bind(this)
     );
     this.app.post(
       "/api/actions/execute/:connectionId/:actionName",
+      strictLimiter,
       this.executeAction.bind(this)
     );
 
-    // Health routes
+    // Health routes (no rate limiting)
     this.app.get("/api/health", this.healthCheck.bind(this));
-    this.app.get("/api/status", this.getStatus.bind(this));
+    this.app.get("/api/status", moderateLimiter, this.getStatus.bind(this));
+
+    // 404 handler
+    this.app.use((_req: Request, res: Response) => {
+      res.status(404).json({ error: "Endpoint not found" });
+    });
+
+    // Global error handler
+    this.app.use((err: Error, _req: Request, res: Response, _next: any) => {
+      console.error("[Server Error]", err);
+      res.status(500).json({
+        error: "Internal server error",
+        message:
+          process.env.NODE_ENV === "development" ? err.message : undefined,
+      });
+    });
   }
 
   // Connector route handlers
@@ -309,8 +392,9 @@ export class DatabiteServer {
         return res.status(404).json({ error: "Connector not found" });
       }
 
-      const actions = Object.values(connector.actions).map(
-        (action: Action<any, any, any>) => ({
+      const actions = Object.entries(connector.actions).map(
+        ([key, action]) => ({
+          name: key,
           id: action.id,
           label: action.label,
           description: action.description,
@@ -334,6 +418,7 @@ export class DatabiteServer {
     try {
       const { connectionId, actionName } = req.params;
       const params = req.body;
+
       const result = await this.engine.executeAction(
         connectionId,
         actionName,

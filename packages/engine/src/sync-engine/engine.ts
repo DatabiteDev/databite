@@ -18,6 +18,10 @@ export class SyncEngine {
   private getConnection: (id: string) => Connection<any> | undefined;
   private getIntegration: (id: string) => Integration<any> | undefined;
   private getConnector: (id: string) => Connector<any, any> | undefined;
+  private updateConnectionMetadata: (
+    connectionId: string,
+    metadata: Record<string, any>
+  ) => Promise<void>;
   private rateLimiter: IntegrationRateLimiter;
 
   constructor(config: SyncEngineConfig) {
@@ -26,10 +30,14 @@ export class SyncEngine {
     this.getConnection = config.getConnection;
     this.getIntegration = config.getIntegration;
     this.getConnector = config.getConnector;
+    this.updateConnectionMetadata = config.updateConnectionMetadata;
     this.rateLimiter = config.rateLimiter || new IntegrationRateLimiter();
     this.initialize();
   }
 
+  /**
+   * Initialize the sync engine's adapter
+   */
   private async initialize(): Promise<void> {
     await this.adapter.initialize();
   }
@@ -110,17 +118,24 @@ export class SyncEngine {
     const { connectionId, syncName } = data;
     const startTime = Date.now();
 
-    try {
-      const connection = this.getConnection(connectionId);
-      if (!connection) {
-        throw new Error(`Connection '${connectionId}' not found`);
-      }
+    console.log(
+      `Executing sync '${syncName}' for connection '${connectionId}'`
+    );
 
+    // Get connection once
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection '${connectionId}' not found`);
+    }
+
+    try {
+      // Get integration
       const integration = this.getIntegration(connection.integrationId);
       if (!integration) {
         throw new Error(`Integration '${connection.integrationId}' not found`);
       }
 
+      // Get connector
       const connector = this.getConnector(integration.connectorId);
       if (!connector) {
         throw new Error(`Connector '${integration.connectorId}' not found`);
@@ -151,6 +166,7 @@ export class SyncEngine {
         }
       }
 
+      // Get sync
       const sync = connector.syncs[syncName];
       if (!sync) {
         throw new Error(
@@ -158,21 +174,57 @@ export class SyncEngine {
         );
       }
 
+      // Execute sync
       const result = await sync.handler(connection);
       const executionTime = Date.now() - startTime;
+
+      // Update connection metadata
+      await this.updateConnectionMetadata(connectionId, {
+        syncs: {
+          ...connection.metadata?.syncs,
+          [syncName]: {
+            success: true,
+            lastRun: new Date(),
+            executionTime,
+            lastResult: result as ExecutionResult,
+          },
+        },
+      });
+
+      const timestamp = new Date();
+
+      console.log(
+        `Sync '${syncName}' for connection '${connectionId}' completed successfully in ${executionTime}ms at ${timestamp.toISOString()}`
+      );
 
       return {
         success: true,
         data: result,
         executionTime,
-        timestamp: new Date(),
+        timestamp,
       };
     } catch (error) {
       const executionTime = Date.now() - startTime;
+
       console.error(
         `Sync '${syncName}' failed for connection '${connectionId}':`,
         error
       );
+
+      // Update connection metadata (safe since connection is already fetched)
+      await this.updateConnectionMetadata(connectionId, {
+        syncs: {
+          ...(connection.metadata?.syncs ?? {}),
+          [syncName]: {
+            success: false,
+            lastRun: new Date(),
+            executionTime,
+            lastResult: {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          },
+        },
+      });
 
       return {
         success: false,

@@ -89,6 +89,8 @@ export class DatabiteEngine {
       getConnection: (id) => this.connections.get(id),
       getIntegration: (id) => this.integrations.get(id),
       getConnector: (id) => this.connectors.get(id),
+      updateConnectionMetadata: (id, metadata) =>
+        this.updateConnectionMetadata(id, metadata),
       rateLimiter: this.rateLimiter,
     });
 
@@ -226,6 +228,25 @@ export class DatabiteEngine {
 
     // Schedule syncs for the new connection
     await this.scheduleConnectionSyncs(connection.id);
+
+    // Export data if exporter is configured
+    await this.exportData();
+  }
+
+  /**
+   * Update a connection's metadata
+   */
+  async updateConnectionMetadata(
+    connectionId: string,
+    metadata: Record<string, any>
+  ): Promise<void> {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error("Connection not found");
+    }
+
+    // Update metadata
+    connection.metadata = { ...connection.metadata, ...metadata };
 
     // Export data if exporter is configured
     await this.exportData();
