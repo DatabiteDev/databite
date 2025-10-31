@@ -1,5 +1,17 @@
 # example-webapp
 
+## 1.0.0
+
+### Major Changes
+
+- 950dc14: First working production version of the databite libraries
+
+### Patch Changes
+
+- Updated dependencies [950dc14]
+  - @databite/connect@3.0.0
+  - @databite/types@4.0.0
+
 ## 0.4.0
 
 ### Minor Changes

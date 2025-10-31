@@ -1,5 +1,11 @@
 # @databite/types
 
+## 4.0.0
+
+### Major Changes
+
+- 950dc14: First working production version of the databite libraries
+
 ## 3.0.0
 
 ### Major Changes

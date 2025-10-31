@@ -1,5 +1,16 @@
 # @databite/connect
 
+## 3.0.0
+
+### Major Changes
+
+- 950dc14: First working production version of the databite libraries
+
+### Patch Changes
+
+- Updated dependencies [950dc14]
+  - @databite/types@4.0.0
+
 ## 2.0.0
 
 ### Major Changes
