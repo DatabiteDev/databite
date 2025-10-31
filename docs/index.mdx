@@ -1,36 +1,28 @@
 ---
 title: "Databite SDK"
-description: "A comprehensive TypeScript SDK for building, managing, and executing connectors to third-party APIs"
+description: "Simple way to host a connector API server and connect from your frontend"
 ---
 
 <img className="block rounded-md" src="/images/hero.png" alt="Databite SDK" />
 
 ## Welcome to Databite SDK
 
-The Databite SDK is a powerful, type-safe TypeScript framework for building integrations with third-party APIs. Whether you're creating simple API connectors or complex data synchronization workflows, Databite provides the tools you need to build robust, maintainable integrations.
+Databite helps you self-host a simple API server for connectors and connect to it from your frontend. You run a server with `@databite/server`, then use `@databite/connect` in your app to authenticate users and create connections.
 
 ## Why Databite?
 
 <CardGroup cols={2}>
-  <Card title="Type-Safe by Design" icon="shield-check" href="/packages/types">
-    Built with TypeScript from the ground up, ensuring type safety across all
-    your integrations
+  <Card title="Server" icon="server" href="/packages/server">
+    Host a REST API that exposes connectors, integrations, connections, flows, and sync jobs
   </Card>
-  <Card title="AI-Powered Generation" icon="robot" href="/packages/ai">
-    Generate connectors automatically from API documentation using advanced AI
-    models
+  <Card title="React Connect" icon="react" href="/packages/connect">
+    Use a drop-in modal to authenticate and create connections from your app
   </Card>
-  <Card title="React Integration" icon="react" href="/packages/connect">
-    Pre-built React components for seamless UI integration and user
-    authentication flows
+  <Card title="Build Connectors" icon="wrench" href="/packages/build">
+    Fluent API to define custom connectors and integrations
   </Card>
-  <Card
-    title="Data Synchronization"
-    icon="arrows-rotate"
-    href="/packages/engine"
-  >
-    Powerful sync engine with automatic scheduling, retry logic, and error
-    handling
+  <Card title="Sync Engine" icon="arrows-rotate" href="/packages/engine">
+    Optional scheduling and execution for sync jobs
   </Card>
 </CardGroup>
 
@@ -39,24 +31,22 @@ The Databite SDK is a powerful, type-safe TypeScript framework for building inte
 Get up and running with Databite in minutes:
 
 ```bash
-# Install core packages
-npm install @databite/build @databite/flow @databite/types
+# Install main packages
+npm install @databite/server @databite/connect
 
-# Install additional packages as needed
-npm install @databite/connectors @databite/connect @databite/engine
+# Optional (custom connectors, sync, types)
+npm install @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 <Steps>
-  <Step title="Create Your First Connector">
-    Use the fluent API to define your connector with authentication flows and
-    actions
+  <Step title="Start your server">
+    Create and run a Databite server that hosts connectors and integrations
   </Step>
-  <Step title="Build Interactive Workflows">
-    Create user-friendly authentication and data processing flows with the Flow
-    engine
+  <Step title="Add integrations">
+    Add built-in or custom connectors and create integrations on your server
   </Step>
-  <Step title="Deploy and Sync">
-    Set up automatic data synchronization with the Engine package
+  <Step title="Connect from your app">
+    Use the React modal to authenticate and create connections via your server
   </Step>
 </Steps>
 
@@ -65,17 +55,15 @@ npm install @databite/connectors @databite/connect @databite/engine
 The Databite SDK follows a modular architecture with clear separation of concerns:
 
 <AccordionGroup>
-  <Accordion title="Core Packages">
-    - **@databite/types** - Shared TypeScript types and interfaces -
-    **@databite/build** - Core SDK for building connectors with fluent API -
-    **@databite/flow** - Flow engine for complex authentication and data
-    workflows
+  <Accordion title="Main Libraries">
+    - **@databite/server** - Express server with REST API
+    - **@databite/connect** - React components for client integration
   </Accordion>
-  <Accordion title="Integration Packages">
-    - **@databite/connectors** - Library of pre-built connectors (Slack, Trello,
-    etc.) - **@databite/connect** - React components for UI integration -
-    **@databite/engine** - Data synchronization and execution engine -
-    **@databite/ai** - AI-powered connector generator from API documentation
+  <Accordion title="Supporting Libraries">
+    - **@databite/build** - Fluent API to build connectors
+    - **@databite/connectors** - Pre-built connectors
+    - **@databite/engine** - Optional sync engine
+    - **@databite/types** - Shared TypeScript types
   </Accordion>
 </AccordionGroup>
 
@@ -90,13 +78,13 @@ Databite uses a clear three-tier hierarchy for managing integrations:
 ## What's Next?
 
 <CardGroup cols={3}>
-  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
-    Get started with your first connector in 5 minutes
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Stand up a server and connect from your app in minutes
   </Card>
-  <Card title="Package Documentation" icon="book" href="/packages/types">
-    Explore detailed documentation for each package
+  <Card title="Server API" icon="book" href="/packages/server">
+    Explore server setup and API endpoints
   </Card>
   <Card title="Example Web App" icon="code" href="/examples/webapp">
-    See a complete implementation example
+    See a working client that talks to your server
   </Card>
 </CardGroup>

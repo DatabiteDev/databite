@@ -1,0 +1,81 @@
+---
+title: "Example Server"
+description: "Minimal example showing how to run a Databite server"
+---
+
+## Overview
+
+This example shows a minimal Express-based Databite server that exposes REST endpoints for your frontend to use.
+
+## Repository
+
+The example server is available in our open-source repository:
+
+<Card
+  title="View on GitHub"
+  icon="github"
+  href="https://github.com/DatabiteDev/databite/tree/main/packages/example-server"
+>
+  Explore the complete implementation with source code and configuration
+</Card>
+
+## Steps
+
+1) Install dependencies
+
+```bash
+npm install @databite/server @databite/engine @databite/connectors @databite/types
+npm install express helmet express-rate-limit
+```
+
+2) Configure environment
+
+```bash
+# .env.local
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+SLACK_REDIRECT_URI=http://localhost:3001/auth/slack/callback
+```
+
+3) Run the server
+
+```typescript
+import { DatabiteServer } from "@databite/server";
+import { InMemoryAdapter } from "@databite/engine";
+import { slack } from "@databite/connectors";
+
+async function main() {
+  const server = new DatabiteServer({
+    port: 3001,
+    engineConfig: {
+      schedulerAdapter: new InMemoryAdapter(),
+      minutesBetweenSyncs: 10,
+    },
+  });
+
+  await server.addIntegration(
+    slack.createIntegration("Slack Integration", {
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      redirectUri: process.env.SLACK_REDIRECT_URI!,
+      scopes: ["chat:write", "channels:read"],
+    })
+  );
+
+  await server.start();
+  console.log("Server running at http://localhost:3001");
+}
+
+main().catch(console.error);
+```
+
+4) Test endpoints
+
+```bash
+curl http://localhost:3001/api/health
+curl http://localhost:3001/api/integrations
+```
+
+Next, connect from your frontend using `@databite/connect`.
+
+

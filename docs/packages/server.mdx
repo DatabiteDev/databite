@@ -1,0 +1,188 @@
+---
+title: "@databite/server"
+description: "Express server with RESTful API endpoints for connectors, integrations, connections, flows, sync jobs, and actions"
+---
+
+## Overview
+
+`@databite/server` lets you host a REST API that your frontend uses to list connectors, manage integrations, authenticate, create connections, run sync jobs, and execute actions.
+
+## Installation
+
+```bash
+npm install @databite/server @databite/engine @databite/types
+npm install express helmet express-rate-limit
+```
+
+## Basic Setup
+
+```typescript
+import { DatabiteServer } from "@databite/server";
+import { InMemoryAdapter } from "@databite/engine";
+import { slack } from "@databite/connectors";
+
+async function main() {
+  const server = new DatabiteServer({
+    port: 3001,
+    engineConfig: {
+      schedulerAdapter: new InMemoryAdapter(),
+      minutesBetweenSyncs: 10,
+    },
+  });
+
+  await server.addIntegration(
+    slack.createIntegration("Slack Integration", {
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      redirectUri: process.env.SLACK_REDIRECT_URI!,
+      scopes: ["chat:write", "channels:read"],
+    })
+  );
+
+  await server.start();
+}
+
+main().catch(console.error);
+```
+
+## Security (optional)
+
+```typescript
+const server = new DatabiteServer({
+  port: 3001,
+  engineConfig: { schedulerAdapter: new InMemoryAdapter(), minutesBetweenSyncs: 10 },
+  security: {
+    rateLimit: { windowMs: 15 * 60 * 1000, max: 100 },
+    allowedOrigins: ["http://localhost:3000"],
+    enableHelmet: true,
+    enableRateLimit: true,
+  },
+});
+```
+
+## API Reference
+
+All endpoints are prefixed with `/api`. JSON is returned unless noted.
+
+### Health
+
+```http
+GET /api/health          # Health check (no rate limit)
+GET /api/status          # Server status (30 req/min)
+```
+
+Example:
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+```json
+{ "status": "healthy", "timestamp": "2024-01-01T00:00:00.000Z" }
+```
+
+### Connectors (30 req/min)
+
+```http
+GET /api/connectors        # List all connectors
+GET /api/connectors/:id    # Get connector by ID
+```
+
+### Integrations (30 req/min)
+
+```http
+GET /api/integrations      # List all integrations
+GET /api/integrations/:id  # Get integration by ID
+```
+
+### Connections
+
+```http
+GET    /api/connections            # List all connections (30 req/min)
+GET    /api/connections/:id        # Get connection by ID (30 req/min)
+POST   /api/connections            # Add a connection (5 req/min)
+DELETE /api/connections/:id        # Remove a connection (5 req/min)
+```
+
+Example (create connection):
+
+```bash
+curl -X POST http://localhost:3001/api/connections \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "conn-1",
+    "integrationId": "int-1",
+    "config": { "accessToken": "token123" },
+    "status": "active",
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-01T00:00:00Z"
+  }'
+```
+
+### Flows
+
+```http
+POST   /api/flows/start               # Start a flow session (5 req/min)
+POST   /api/flows/:sessionId/step     # Execute a flow step (30 req/min)
+GET    /api/flows/:sessionId          # Get flow session details (30 req/min)
+DELETE /api/flows/:sessionId          # Delete a flow session (5 req/min)
+```
+
+### Sync Operations
+
+```http
+GET  /api/sync/jobs                            # List all scheduled jobs (30 req/min)
+GET  /api/sync/jobs/:connectionId              # Jobs for a connection (30 req/min)
+POST /api/sync/execute/:connectionId/:syncName # Execute a sync (5 req/min)
+```
+
+### Actions
+
+```http
+GET  /api/actions/:connectorId                         # Get actions for a connector (30 req/min)
+POST /api/actions/execute/:connectionId/:actionName    # Execute an action (5 req/min)
+```
+
+### Error Responses
+
+```json
+{ "error": "Connection not found" }
+```
+
+Rate limit exceeded:
+
+```json
+{ "error": "Too many requests from this IP, please try again later." }
+```
+
+## Example Requests
+
+List integrations:
+
+```bash
+curl http://localhost:3001/api/integrations
+```
+
+Execute an action:
+
+```bash
+curl -X POST http://localhost:3001/api/actions/execute/conn-1/sendMessage \
+  -H "Content-Type: application/json" \
+  -d '{ "channel": "#general", "text": "Hello from API!" }'
+```
+
+## Best Practices
+
+- Restrict CORS to your app’s domains in production
+- Enable rate limits and security headers
+- Never log or return secrets
+- Use HTTPS behind a reverse proxy
+
+## Related Packages
+
+- [@databite/connect](/packages/connect) - Client components to authenticate and create connections
+- [@databite/connectors](/packages/connectors) - Pre-built connectors
+- [@databite/engine](/packages/engine) - Optional sync engine
+- [@databite/types](/packages/types) - Shared types
+
+

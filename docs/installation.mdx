@@ -13,16 +13,11 @@ Before installing Databite SDK, ensure you have:
 
 ## Core Installation
 
-Install the essential Databite packages:
+Install the main Databite packages:
 
 ```bash
-npm install @databite/build @databite/flow @databite/types
+npm install @databite/server @databite/connect
 ```
-
-<Warning>
-  These three packages are the core of the Databite SDK and are required for
-  most use cases.
-</Warning>
 
 ## Additional Packages
 
@@ -30,16 +25,10 @@ Install additional packages based on your needs:
 
 ### React Integration
 
-For React applications with UI components:
+`@databite/connect` requires React peer dependencies:
 
 ```bash
-npm install @databite/connect
-```
-
-**Peer Dependencies:**
-
-```bash
-npm install react react-dom
+npm install react react-dom typescript
 ```
 
 ### Pre-built Connectors
@@ -50,68 +39,54 @@ For ready-to-use connectors:
 npm install @databite/connectors
 ```
 
-### Data Synchronization
-
-For automated data synchronization:
+### Data Synchronization (optional)
 
 ```bash
-npm install @databite/engine
+npm install @databite/engine bullmq
 ```
 
-**Peer Dependencies:**
 
-```bash
-npm install bullmq
-```
-
-### AI Connector Generation
-
-For AI-powered connector generation:
-
-```bash
-npm install @databite/ai
-```
 
 ## Package Manager Options
 
 ### npm
 
 ```bash
-# Core packages
-npm install @databite/build @databite/flow @databite/types
+# Main packages
+npm install @databite/server @databite/connect
 
-# Additional packages
-npm install @databite/connect @databite/connectors @databite/engine @databite/ai
+# Optional packages
+npm install @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 ### yarn
 
 ```bash
-# Core packages
-yarn add @databite/build @databite/flow @databite/types
+# Main packages
+yarn add @databite/server @databite/connect
 
-# Additional packages
-yarn add @databite/connect @databite/connectors @databite/engine @databite/ai
+# Optional packages
+yarn add @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 ### pnpm
 
 ```bash
-# Core packages
-pnpm add @databite/build @databite/flow @databite/types
+# Main packages
+pnpm add @databite/server @databite/connect
 
-# Additional packages
-pnpm add @databite/connect @databite/connectors @databite/engine @databite/ai
+# Optional packages
+pnpm add @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 ### bun
 
 ```bash
-# Core packages
-bun add @databite/build @databite/flow @databite/types
+# Main packages
+bun add @databite/server @databite/connect
 
-# Additional packages
-bun add @databite/connect @databite/connectors @databite/engine @databite/ai
+# Optional packages
+bun add @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 ## TypeScript Configuration
@@ -152,18 +127,13 @@ For client-side usage with React:
 
 ```typescript
 import { ConnectModal } from "@databite/connect";
-import { createFlow } from "@databite/flow";
 ```
 
 ### Next.js
 
-For Next.js applications:
+For Next.js applications, add the modal where you need user authentication:
 
 ```typescript
-// pages/api/connectors.ts
-import { createConnector } from "@databite/build";
-
-// components/ConnectButton.tsx
 import { ConnectModal } from "@databite/connect";
 ```
 

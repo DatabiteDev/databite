@@ -1,16 +1,16 @@
 ---
 title: "@databite/connectors"
-description: "A comprehensive library of pre-built connectors for popular third-party APIs"
+description: "A library of pre-built connectors following the Databite connector pattern"
 ---
 
 ## Overview
 
-The `@databite/connectors` package provides ready-to-use connectors for popular services like Slack, Trello, GitHub, and more. Each connector includes built-in authentication flows, type-safe configuration, and comprehensive action and sync implementations.
+The `@databite/connectors` package provides ready-to-use connectors for popular services. Each connector follows the same structure: authentication, typed configuration, actions, and optional syncs. Use them on your server with `@databite/server` and connect from your app with `@databite/connect`.
 
 ## Installation
 
 ```bash
-npm install @databite/connectors @databite/build @databite/flow @databite/types
+npm install @databite/connectors @databite/build @databite/types
 ```
 
 **Peer Dependencies:**
@@ -19,543 +19,54 @@ npm install @databite/connectors @databite/build @databite/flow @databite/types
 npm install zod typescript
 ```
 
-## Available Connectors
+## Connector Structure
 
-### Slack Connector
-
-Connect to Slack workspaces for messaging, channel management, and user synchronization.
-
-#### Features
-
-- OAuth 2.0 authentication flow
-- Automatic token refresh
-- Type-safe configuration with Zod schemas
-- Extensible with custom actions and syncs
-
-#### Configuration
-
-```typescript
-import { slackConnector } from "@databite/connectors";
-
-// Integration config
-const integrationConfig = {
-  clientId: "your-slack-client-id",
-  clientSecret: "your-slack-client-secret",
-  redirectUri: "https://your-app.com/auth/slack/callback",
-};
-
-// Connection config (set during authentication)
-const connectionConfig = {
-  accessToken: "xoxb-...",
-  refreshToken: "xoxr-...",
-};
+```
+connectors/
+└── example-service/
+    ├── index.ts            # Connector definition (entry point)
+    ├── actions/            # Actions (API calls)
+         ├── sendMessage.ts
+         └── listItems.ts
+    └── syncs/              # Sync handlers (optional)
+        ├── syncUsers.ts
+        └── syncItems.ts
 ```
 
-#### Usage
+## Generic Usage
 
 ```typescript
-// Create an integration
-const slackIntegration = slackConnector.createIntegration(
-  "My Slack Integration",
-  integrationConfig
-);
+import { exampleService } from "@databite/connectors";
 
-// The connector includes built-in authentication flow
-// Use with @databite/connect for UI integration
-import { ConnectModal } from "@databite/connect";
-
-function SlackConnect() {
-  return (
-    <ConnectModal
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      integration={slackIntegration}
-      onAuthSuccess={(integration, config) => {
-        console.log("Slack connected:", config);
-      }}
-    />
-  );
-}
-```
-
-### Trello Connector
-
-Connect to Trello boards for project management and task tracking.
-
-#### Features
-
-- API key authentication
-- Type-safe configuration with Zod schemas
-- Extensible with custom actions and syncs
-- Built-in authentication flow
-
-#### Configuration
-
-```typescript
-import { trelloConnector } from "@databite/connectors";
-
-// Integration config (empty for Trello)
-const integrationConfig = {};
-
-// Connection config (set during authentication)
-const connectionConfig = {
-  apiKey: "your-trello-api-key",
-};
-```
-
-#### Usage
-
-```typescript
-// Create an integration
-const trelloIntegration = trelloConnector.createIntegration(
-  "My Trello Integration",
-  integrationConfig
-);
-
-// The connector includes built-in authentication flow
-// Use with @databite/connect for UI integration
-import { ConnectModal } from "@databite/connect";
-
-function TrelloConnect() {
-  return (
-    <ConnectModal
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      integration={trelloIntegration}
-      onAuthSuccess={(integration, config) => {
-        console.log("Trello connected:", config);
-      }}
-    />
-  );
-}
-```
-
-## Usage Examples
-
-### Basic Connector Usage
-
-```typescript
-import { slackConnector, trelloConnector } from "@databite/connectors";
-import { createIntegration, createConnection } from "@databite/build";
-
-// Create a Slack integration
-const slackIntegration = slackConnector.createIntegration(
-  "My Slack Integration",
-  {
-    clientId: "your-client-id",
-    clientSecret: "your-client-secret",
-    redirectUri: "https://your-app.com/auth/slack/callback",
-  }
-);
-
-// Create a connection
-const slackConnection = createConnection({
-  integrationId: slackIntegration.id,
-  config: {
-    accessToken: "xoxb-...",
-    teamId: "T1234567890",
-    teamName: "My Workspace",
-  },
-});
-
-// Send a message
-await slackConnector.actions.sendMessage.handler(
-  {
-    channel: "#general",
-    text: "Hello from my app!",
-  },
-  slackConnection
+// Create an integration on your server
+await server.addIntegration(
+  exampleService.createIntegration("Example Service", {
+    // Integration configuration (varies by connector)
+    apiKey: process.env.EXAMPLE_API_KEY!,
+    baseUrl: process.env.EXAMPLE_BASE_URL!,
+  })
 );
 ```
 
-### Using Multiple Connectors
-
-```typescript
-import { slackConnector, trelloConnector } from "@databite/connectors";
-
-class MultiConnectorService {
-  private connections = new Map<string, any>();
-
-  async setupConnections() {
-    // Setup Slack connection
-    const slackConnection = await this.setupSlackConnection();
-    this.connections.set("slack", slackConnection);
-
-    // Setup Trello connection
-    const trelloConnection = await this.setupTrelloConnection();
-    this.connections.set("trello", trelloConnection);
-  }
-
-  async createTaskInTrelloAndNotifySlack(taskData: any) {
-    // Create card in Trello
-    const trelloConnection = this.connections.get("trello");
-    const card = await trelloConnector.actions.createCard.handler(
-      {
-        name: taskData.title,
-        desc: taskData.description,
-        idList: taskData.listId,
-      },
-      trelloConnection
-    );
-
-    // Notify in Slack
-    const slackConnection = this.connections.get("slack");
-    await slackConnector.actions.sendMessage.handler(
-      {
-        channel: taskData.slackChannel,
-        text: `New task created: ${card.name}`,
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `*New Task Created*\n*Title:* ${card.name}\n*Trello Link:* ${card.url}`,
-            },
-          },
-        ],
-      },
-      slackConnection
-    );
-
-    return card;
-  }
-
-  private async setupSlackConnection() {
-    // Your Slack authentication logic
-    return {
-      accessToken: "xoxb-...",
-      teamId: "T1234567890",
-      teamName: "My Workspace",
-    };
-  }
-
-  private async setupTrelloConnection() {
-    // Your Trello authentication logic
-    return {
-      accessToken: "trello-access-token",
-      userId: "trello-user-id",
-      username: "trello-username",
-    };
-  }
-}
-```
-
-### Data Synchronization
-
-```typescript
-import { slackConnector, trelloConnector } from "@databite/connectors";
-
-class DataSyncService {
-  async syncAllData() {
-    const results = {
-      slack: await this.syncSlackData(),
-      trello: await this.syncTrelloData(),
-    };
-
-    console.log("Sync completed:", results);
-    return results;
-  }
-
-  private async syncSlackData() {
-    const connection = await this.getSlackConnection();
-
-    const [users, channels, messages] = await Promise.all([
-      slackConnector.syncs.syncUsers.handler(connection),
-      slackConnector.syncs.syncChannels.handler(connection),
-      slackConnector.syncs.syncMessages.handler(connection),
-    ]);
-
-    return {
-      users: users.length,
-      channels: channels.length,
-      messages: messages.length,
-    };
-  }
-
-  private async syncTrelloData() {
-    const connection = await this.getTrelloConnection();
-
-    const [boards, cards, members] = await Promise.all([
-      trelloConnector.syncs.syncBoards.handler(connection),
-      trelloConnector.syncs.syncCards.handler(connection),
-      trelloConnector.syncs.syncMembers.handler(connection),
-    ]);
-
-    return {
-      boards: boards.length,
-      cards: cards.length,
-      members: members.length,
-    };
-  }
-}
-```
-
-### Error Handling
-
-```typescript
-import { slackConnector } from "@databite/connectors";
-
-class SlackService {
-  async sendMessageSafely(messageData: any, connection: any) {
-    try {
-      const result = await slackConnector.actions.sendMessage.handler(
-        messageData,
-        connection
-      );
-
-      console.log("Message sent successfully:", result);
-      return result;
-    } catch (error) {
-      if (error.message.includes("channel_not_found")) {
-        console.error("Channel not found, creating it...");
-        await this.createChannelAndRetry(messageData, connection);
-      } else if (error.message.includes("not_authed")) {
-        console.error("Authentication failed, refreshing token...");
-        await this.refreshConnection(connection);
-      } else {
-        console.error("Unexpected error:", error);
-        throw error;
-      }
-    }
-  }
-
-  private async createChannelAndRetry(messageData: any, connection: any) {
-    // Create the channel first
-    await slackConnector.actions.createChannel.handler(
-      {
-        name: messageData.channel.replace("#", ""),
-        isPrivate: false,
-      },
-      connection
-    );
-
-    // Retry sending the message
-    return await slackConnector.actions.sendMessage.handler(
-      messageData,
-      connection
-    );
-  }
-}
-```
+Use with `@databite/connect` on the client to authenticate and create a connection via your server.
 
 ## Configuration
 
-### Environment Variables
-
-Set up your environment variables for each connector:
-
-```bash
-# Slack
-SLACK_CLIENT_ID=your-slack-client-id
-SLACK_CLIENT_SECRET=your-slack-client-secret
-SLACK_REDIRECT_URI=https://your-app.com/auth/slack/callback
-
-# Trello
-TRELLO_API_KEY=your-trello-api-key
-TRELLO_API_TOKEN=your-trello-api-token
-```
-
-### Connector Configuration
+Connector configuration mirrors the service's requirements. A typical pattern:
 
 ```typescript
-import { slackConnector, trelloConnector } from "@databite/connectors";
-
-// Configure Slack connector
-const slackConfig = {
-  clientId: process.env.SLACK_CLIENT_ID!,
-  clientSecret: process.env.SLACK_CLIENT_SECRET!,
-  redirectUri: process.env.SLACK_REDIRECT_URI!,
+// Integration config (static per integration)
+const integrationConfig = {
+  apiKey: process.env.EXAMPLE_API_KEY!,
+  baseUrl: process.env.EXAMPLE_BASE_URL!,
 };
 
-// Configure Trello connector
-const trelloConfig = {
-  apiKey: process.env.TRELLO_API_KEY!,
-  apiToken: process.env.TRELLO_API_TOKEN!,
-};
-```
-
-## Best Practices
-
-### 1. Use Type-Safe Configuration
-
-```typescript
-import { slackConnector } from "@databite/connectors";
-import { z } from "zod";
-
-// Define your configuration schema
-const slackConfigSchema = z.object({
-  clientId: z.string().min(1),
-  clientSecret: z.string().min(1),
-  redirectUri: z.string().url(),
-});
-
-// Validate configuration
-const slackConfig = slackConfigSchema.parse({
-  clientId: process.env.SLACK_CLIENT_ID,
-  clientSecret: process.env.SLACK_CLIENT_SECRET,
-  redirectUri: process.env.SLACK_REDIRECT_URI,
-});
-```
-
-### 2. Implement Proper Error Handling
-
-```typescript
-class ConnectorService {
-  async executeActionSafely<T>(
-    connector: any,
-    actionName: string,
-    params: any,
-    connection: any
-  ): Promise<T | null> {
-    try {
-      const action = connector.actions[actionName];
-      if (!action) {
-        throw new Error(`Action ${actionName} not found`);
-      }
-
-      return await action.handler(params, connection);
-    } catch (error) {
-      console.error(`Action ${actionName} failed:`, error);
-
-      // Implement retry logic or fallback behavior
-      if (this.shouldRetry(error)) {
-        return await this.retryAction(
-          connector,
-          actionName,
-          params,
-          connection
-        );
-      }
-
-      return null;
-    }
-  }
-
-  private shouldRetry(error: any): boolean {
-    // Implement retry logic based on error type
-    return (
-      error.message.includes("rate_limit") || error.message.includes("timeout")
-    );
-  }
-}
-```
-
-### 3. Use Connection Pooling
-
-```typescript
-class ConnectionManager {
-  private connections = new Map<string, any>();
-  private connectionLocks = new Map<string, Promise<any>>();
-
-  async getConnection(connectorId: string, connectionId: string) {
-    const key = `${connectorId}-${connectionId}`;
-
-    if (this.connections.has(key)) {
-      return this.connections.get(key);
-    }
-
-    if (this.connectionLocks.has(key)) {
-      return await this.connectionLocks.get(key);
-    }
-
-    const connectionPromise = this.createConnection(connectorId, connectionId);
-    this.connectionLocks.set(key, connectionPromise);
-
-    try {
-      const connection = await connectionPromise;
-      this.connections.set(key, connection);
-      return connection;
-    } finally {
-      this.connectionLocks.delete(key);
-    }
-  }
-
-  private async createConnection(connectorId: string, connectionId: string) {
-    // Your connection creation logic
-  }
-}
-```
-
-## Testing
-
-### Unit Testing Connectors
-
-```typescript
-import { slackConnector } from "@databite/connectors";
-
-describe("Slack Connector", () => {
-  const mockConnection = {
-    accessToken: "mock-token",
-    teamId: "T1234567890",
-    teamName: "Test Workspace",
-  };
-
-  it("should send a message", async () => {
-    const result = await slackConnector.actions.sendMessage.handler(
-      {
-        channel: "#test",
-        text: "Test message",
-      },
-      mockConnection
-    );
-
-    expect(result.ok).toBe(true);
-    expect(result.message).toBeDefined();
-  });
-
-  it("should create a channel", async () => {
-    const result = await slackConnector.actions.createChannel.handler(
-      {
-        name: "test-channel",
-        isPrivate: false,
-      },
-      mockConnection
-    );
-
-    expect(result.ok).toBe(true);
-    expect(result.channel).toBeDefined();
-  });
-});
-```
-
-### Integration Testing
-
-```typescript
-import { slackConnector, trelloConnector } from "@databite/connectors";
-
-describe("Multi-Connector Integration", () => {
-  it("should create Trello card and notify Slack", async () => {
-    const trelloConnection = await createTrelloConnection();
-    const slackConnection = await createSlackConnection();
-
-    // Create Trello card
-    const card = await trelloConnector.actions.createCard.handler(
-      {
-        name: "Test Card",
-        desc: "Test Description",
-        idList: "test-list-id",
-      },
-      trelloConnection
-    );
-
-    // Notify Slack
-    const message = await slackConnector.actions.sendMessage.handler(
-      {
-        channel: "#general",
-        text: `New card created: ${card.name}`,
-      },
-      slackConnection
-    );
-
-    expect(card.id).toBeDefined();
-    expect(message.ok).toBe(true);
-  });
-});
+// Connection config (set during client authentication)
+// e.g. accessToken, userId, workspaceId, etc.
 ```
 
 ## Related Packages
 
 - [@databite/build](/packages/build) - Core connector builder SDK
-- [@databite/flow](/packages/flow) - Flow engine for complex workflows
 - [@databite/engine](/packages/engine) - Data synchronization and execution engine
 - [@databite/types](/packages/types) - Shared TypeScript types

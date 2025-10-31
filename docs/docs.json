@@ -18,53 +18,21 @@
             "pages": ["index", "quickstart", "installation"]
           },
           {
-            "group": "Core Packages",
-            "pages": ["packages/types", "packages/build", "packages/flow"]
+            "group": "Main Libraries",
+            "pages": ["packages/server", "packages/connect"]
           },
           {
-            "group": "Integration Packages",
-            "pages": [
-              "packages/connectors",
-              "packages/connect",
-              "packages/engine",
-              "packages/ai"
-            ]
-          },
-          {
-            "group": "Examples",
-            "pages": ["examples/webapp"]
+            "group": "Supporting Libraries",
+            "pages": ["packages/build", "packages/connectors", "packages/engine", "packages/types"]
           }
         ]
       },
       {
-        "tab": "Guides",
+        "tab": "Examples",
         "groups": [
           {
-            "group": "Getting Started",
-            "pages": [
-              "guides/your-first-connector",
-              "guides/authentication-flows",
-              "guides/data-synchronization"
-            ]
-          },
-          {
-            "group": "Advanced Topics",
-            "pages": [
-              "guides/custom-connectors",
-              "guides/error-handling",
-              "guides/testing-connectors",
-              "guides/ai-connector-generation",
-              "guides/react-integration",
-              "guides/flow-workflows"
-            ]
-          },
-          {
-            "group": "Troubleshooting",
-            "pages": [
-              "guides/common-issues",
-              "guides/debugging",
-              "guides/performance-optimization"
-            ]
+            "group": "Examples",
+            "pages": ["examples/server", "examples/webapp"]
           }
         ]
       }
