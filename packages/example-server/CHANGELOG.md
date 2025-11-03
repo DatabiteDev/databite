@@ -1,5 +1,15 @@
 # example-server
 
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connectors@4.0.0
+  - @databite/types@5.0.0
+  - @databite/engine@3.0.1
+  - @databite/server@2.0.1
+
 ## 1.0.0
 
 ### Major Changes

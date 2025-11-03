@@ -1,5 +1,13 @@
 # example-webapp
 
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/types@5.0.0
+  - @databite/connect@3.0.1
+
 ## 1.0.0
 
 ### Major Changes

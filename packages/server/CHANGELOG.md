@@ -1,5 +1,13 @@
 # @databite/server
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/types@5.0.0
+  - @databite/engine@3.0.1
+
 ## 2.0.0
 
 ### Major Changes

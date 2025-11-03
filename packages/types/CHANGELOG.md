@@ -1,5 +1,11 @@
 # @databite/types
 
+## 5.0.0
+
+### Major Changes
+
+- Added integration parameter to refresh
+
 ## 4.0.0
 
 ### Major Changes

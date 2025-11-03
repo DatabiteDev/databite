@@ -1,5 +1,17 @@
 # @databite/connectors
 
+## 4.0.0
+
+### Major Changes
+
+- Added integration parameter to refresh
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/build@4.0.0
+  - @databite/types@5.0.0
+
 ## 3.0.0
 
 ### Major Changes

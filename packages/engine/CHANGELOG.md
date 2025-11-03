@@ -1,5 +1,14 @@
 # @databite/engine
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/build@4.0.0
+  - @databite/connectors@4.0.0
+  - @databite/types@5.0.0
+
 ## 3.0.0
 
 ### Major Changes
