@@ -82,7 +82,8 @@ export interface Connector<
 
   /** Connector's refresh action */
   refresh?: (
-    connection: Connection<TConnectionConfig>
+    connection: Connection<TConnectionConfig>,
+    integration: Integration<TIntegrationConfig>
   ) => Promise<z.infer<TConnectionConfig>>;
 
   /** Connector's actions */

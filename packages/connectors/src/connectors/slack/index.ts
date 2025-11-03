@@ -95,7 +95,7 @@ export const slack = createConnector<
       })
       .returns((ctx) => ctx.result)
   )
-  .withRefresh(async (connection) => {
+  .withRefresh(async (connection, _integration) => {
     return connection.config;
   })
   .withRateLimit({
