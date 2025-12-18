@@ -19,7 +19,11 @@
           },
           {
             "group": "Guides",
-            "pages": ["guides/your-first-connector", "guides/setting-up-your-first-server", "guides/using-connect-in-your-frontend"]
+            "pages": [
+              "guides/your-first-connector",
+              "guides/setting-up-your-first-server",
+              "guides/using-connect-in-your-frontend"
+            ]
           },
           {
             "group": "Libraries",
@@ -72,8 +76,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Get Started",
-      "href": "https://databite.dev/sign-up"
+      "label": "Github",
+      "href": "https://github.com/DatabiteDev/databite"
     }
   },
   "contextual": {
