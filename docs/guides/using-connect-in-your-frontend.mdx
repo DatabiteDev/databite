@@ -1,5 +1,5 @@
 ---
-title: "Using @databite/connect in Your Frontend"
+title: "Connect To Your Server From Your Frontend"
 description: "Guide to integrate Databite connectors into React applications using the connect library"
 ---
 
@@ -44,7 +44,10 @@ interface ConnectButtonProps {
   onConnectionSuccess?: (connection: any) => void;
 }
 
-export function ConnectButton({ integrationId, onConnectionSuccess }: ConnectButtonProps) {
+export function ConnectButton({
+  integrationId,
+  onConnectionSuccess,
+}: ConnectButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -114,16 +117,18 @@ interface IntegrationWithConnector {
 }
 
 export function IntegrationList() {
-  const [integrations, setIntegrations] = useState<IntegrationWithConnector[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationWithConnector[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getIntegrationsWithConnectors(process.env.NEXT_PUBLIC_DATABITE_API_URL!)
-      .then(data => {
+      .then((data) => {
         setIntegrations(data);
         setLoading(false);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error("Failed to load integrations:", error);
         setLoading(false);
       });
@@ -182,7 +187,9 @@ export function ConnectionManager() {
 
   const loadConnections = async () => {
     try {
-      const data = await getConnections(process.env.NEXT_PUBLIC_DATABITE_API_URL!);
+      const data = await getConnections(
+        process.env.NEXT_PUBLIC_DATABITE_API_URL!
+      );
       setConnections(data);
     } catch (error) {
       console.error("Failed to load connections:", error);
@@ -193,7 +200,10 @@ export function ConnectionManager() {
 
   const deleteConnection = async (connectionId: string) => {
     try {
-      const success = await removeConnection(process.env.NEXT_PUBLIC_DATABITE_API_URL!, connectionId);
+      const success = await removeConnection(
+        process.env.NEXT_PUBLIC_DATABITE_API_URL!,
+        connectionId
+      );
       if (success) {
         await loadConnections(); // Refresh list
       }
@@ -210,8 +220,11 @@ export function ConnectionManager() {
       {connections.length === 0 ? (
         <p>No connections yet. Connect a service above!</p>
       ) : (
-        connections.map(connection => (
-          <div key={connection.id} className="border p-4 rounded flex justify-between items-center">
+        connections.map((connection) => (
+          <div
+            key={connection.id}
+            className="border p-4 rounded flex justify-between items-center"
+          >
             <div>
               <h3 className="font-semibold">{connection.integration.name}</h3>
               <p className="text-gray-600">Status: {connection.status}</p>
@@ -261,7 +274,11 @@ Once connected, you can execute actions on behalf of users:
 import { executeAction } from "@databite/connect";
 
 // Execute a Slack message action
-const sendMessage = async (connectionId: string, channel: string, text: string) => {
+const sendMessage = async (
+  connectionId: string,
+  channel: string,
+  text: string
+) => {
   try {
     const result = await executeAction(
       process.env.NEXT_PUBLIC_DATABITE_API_URL!,
@@ -290,16 +307,19 @@ sendMessage("conn-123", "#general", "Hello from my app!");
 ## Troubleshooting
 
 **Modal not opening?**
+
 - Check that your integration ID is correct
 - Verify your server is running and accessible
 - Ensure CORS is configured properly on your server
 
 **Authentication failing?**
+
 - Check your OAuth redirect URIs match exactly
 - Verify your connector credentials are valid
 - Look at browser network tab for detailed error messages
 
 **Actions not working?**
+
 - Ensure the connection is active
 - Check that the action name matches exactly
 - Verify the connection has the required permissions
