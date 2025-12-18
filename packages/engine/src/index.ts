@@ -1,2 +1,2 @@
 export * from "./databite-engine";
-export * from "./sync-engine/adapters";
+export * from "./databite-engine/types";

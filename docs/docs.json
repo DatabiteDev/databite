@@ -7,7 +7,7 @@
     "light": "#ff6900",
     "dark": "#ff6900"
   },
-  "favicon": "/images/logo.svg",
+  "favicon": "/images/logo.png",
   "navigation": {
     "tabs": [
       {
@@ -18,12 +18,19 @@
             "pages": ["index", "quickstart", "installation"]
           },
           {
-            "group": "Main Libraries",
-            "pages": ["packages/server", "packages/connect"]
+            "group": "Guides",
+            "pages": ["guides/your-first-connector", "guides/setting-up-your-first-server", "guides/using-connect-in-your-frontend"]
           },
           {
-            "group": "Supporting Libraries",
-            "pages": ["packages/build", "packages/connectors", "packages/engine", "packages/types"]
+            "group": "Libraries",
+            "pages": [
+              "packages/server",
+              "packages/connect",
+              "packages/build",
+              "packages/connectors",
+              "packages/engine",
+              "packages/types"
+            ]
           }
         ]
       },
@@ -53,8 +60,8 @@
     }
   },
   "logo": {
-    "light": "/images/logo.svg",
-    "dark": "/images/logo.svg"
+    "light": "/images/logo.png",
+    "dark": "/images/logo.png"
   },
   "navbar": {
     "links": [

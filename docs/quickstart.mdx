@@ -7,8 +7,6 @@ description: "Run a server and connect from your frontend in minutes"
 
 ```bash
 npm install @databite/server @databite/connect
-# Optional
-npm install @databite/build @databite/connectors @databite/engine @databite/types
 ```
 
 ## 1) Start your server
@@ -17,14 +15,13 @@ Create and run a Databite server. Add integrations using built-in or custom conn
 
 ```typescript
 import { DatabiteServer } from "@databite/server";
-import { InMemoryAdapter } from "@databite/engine";
 import { slack } from "@databite/connectors";
 
 async function main() {
   const server = new DatabiteServer({
     port: 3001,
     engineConfig: {
-      schedulerAdapter: new InMemoryAdapter(),
+      connectors: [slack]
       minutesBetweenSyncs: 10,
     },
   });
@@ -38,7 +35,6 @@ async function main() {
     })
   );
 
-  await server.start();
   console.log("Server running at http://localhost:3001");
 }
 
@@ -70,7 +66,10 @@ export default function Page() {
           await fetch("/api/save-connection", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ integrationId: integration.id, connectionConfig }),
+            body: JSON.stringify({
+              integrationId: integration.id,
+              connectionConfig,
+            }),
           });
         }}
         onAuthError={(e) => console.error(e)}
@@ -79,10 +78,6 @@ export default function Page() {
   );
 }
 ```
-
-## Optional: Sync jobs
-
-Use `@databite/engine` on the server for scheduled syncs. See the Engine page for details.
 
 ## Next Steps
 

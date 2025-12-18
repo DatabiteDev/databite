@@ -235,7 +235,7 @@ export class DatabiteServer {
   // Connection route handlers
   private async getConnections(_req: Request, res: Response) {
     try {
-      const connections = this.engine.getConnections();
+      const connections = await this.engine.getConnections();
       return res.json(connections);
     } catch (error) {
       return res.status(500).json({
@@ -247,7 +247,7 @@ export class DatabiteServer {
   private async getConnection(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const connection = this.engine.getConnection(id);
+      const connection = await this.engine.getConnection(id);
       if (!connection) {
         return res.status(404).json({ error: "Connection not found" });
       }
@@ -442,7 +442,7 @@ export class DatabiteServer {
     try {
       const connectors = this.engine.getConnectors();
       const integrations = this.engine.getIntegrations();
-      const connections = this.engine.getConnections();
+      const connections = await this.engine.getConnections();
       const jobs = await this.engine.getScheduledJobs();
 
       return res.json({

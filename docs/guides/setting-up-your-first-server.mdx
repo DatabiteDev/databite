@@ -1,0 +1,256 @@
+---
+title: "Setting Up Your First Databite Server"
+description: "Step-by-step guide to create and run your first Databite server with connectors"
+---
+
+## Overview
+
+This guide walks you through setting up a Databite server from scratch. You'll learn how to install dependencies, configure connectors, and start serving REST API endpoints for your frontend applications.
+
+## Prerequisites
+
+- Node.js >= 16.0.0
+- npm or pnpm
+- A connector you want to use (we'll use Slack in this example)
+
+## Step 1: Create a New Project
+
+Create a new directory for your server:
+
+```bash
+mkdir my-databite-server
+cd my-databite-server
+npm init -y
+```
+
+## Step 2: Install Dependencies
+
+Install the core Databite packages:
+
+```bash
+npm install @databite/server @databite/engine @databite/types
+npm install express helmet express-rate-limit
+```
+
+Install a connector (Slack example):
+
+```bash
+npm install @databite/connectors
+```
+
+## Step 3: Create Environment Configuration
+
+Create a `.env` file for your secrets:
+
+```bash
+# .env
+SLACK_CLIENT_ID=your-slack-app-client-id
+SLACK_CLIENT_SECRET=your-slack-app-client-secret
+SLACK_REDIRECT_URI=http://localhost:3001/auth/slack/callback
+```
+
+## Step 4: Create the Server
+
+Create `server.ts`:
+
+```typescript
+import { DatabiteServer } from "@databite/server";
+import { slack } from "@databite/connectors";
+
+async function main() {
+  // Create server with basic configuration
+  // Note: connectionStore defaults to InMemoryConnectionStore (data lost on restart)
+  const server = new DatabiteServer({
+    port: 3001,
+    engineConfig: {
+      connectors: [slack],
+      minutesBetweenSyncs: 10,
+    },
+  });
+
+  // Add Slack integration
+  await server.addIntegration(
+    slack.createIntegration("My Slack Integration", {
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      redirectUri: process.env.SLACK_REDIRECT_URI!,
+      scopes: ["chat:write", "channels:read"],
+    })
+  );
+
+  console.log("🚀 Databite server running at http://localhost:3001");
+}
+
+main().catch(console.error);
+```
+
+## Step 5: Configure Connection Storage
+
+By default, Databite uses an in-memory connection store that loses all connection data when the server stops. For development and testing, this is fine, but for production you'll want persistent storage.
+
+### In-Memory Store (Default)
+
+The current setup uses `InMemoryConnectionStore`, which:
+- Stores connections in memory only
+- Loses all data when the server restarts
+- Is perfect for development and testing
+
+### Adding a Persistent Store
+
+For production, implement the `ConnectionStore` interface with your database of choice:
+
+```typescript
+import { DatabiteServer, ConnectionStore, Connection } from "@databite/server";
+import { ConnectionStore as EngineConnectionStore } from "@databite/engine";
+
+// Example PostgreSQL connection store
+class PostgresConnectionStore implements EngineConnectionStore {
+  constructor(private db: any) {} // Your database client
+
+  async create(connection: Connection<any>): Promise<Connection<any>> {
+    // Insert into your database
+    const result = await this.db.query(
+      'INSERT INTO connections (id, integration_id, config, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [connection.id, connection.integrationId, JSON.stringify(connection.config), connection.status, connection.createdAt, connection.updatedAt]
+    );
+    return result.rows[0];
+  }
+
+  async read(connectionId: string): Promise<Connection<any> | undefined> {
+    // Select from your database
+    const result = await this.db.query('SELECT * FROM connections WHERE id = $1', [connectionId]);
+    return result.rows[0];
+  }
+
+  async readAll(): Promise<Connection<any>[]> {
+    // Select all from your database
+    const result = await this.db.query('SELECT * FROM connections');
+    return result.rows;
+  }
+
+  async update(connection: Connection<any>): Promise<Connection<any>> {
+    // Update in your database
+    const result = await this.db.query(
+      'UPDATE connections SET config = $1, status = $2, updated_at = $3 WHERE id = $4 RETURNING *',
+      [JSON.stringify(connection.config), connection.status, connection.updatedAt, connection.id]
+    );
+    return result.rows[0];
+  }
+
+  async delete(connectionId: string): Promise<void> {
+    // Delete from your database
+    await this.db.query('DELETE FROM connections WHERE id = $1', [connectionId]);
+  }
+}
+
+// Use your database store
+const server = new DatabiteServer({
+  port: 3001,
+  engineConfig: {
+    connectors: [slack],
+    connectionStore: new PostgresConnectionStore(dbClient),
+    minutesBetweenSyncs: 10,
+  },
+});
+```
+
+**Recommended databases:**
+- PostgreSQL with `pg` library
+- MySQL with `mysql2` library  
+- MongoDB with `mongodb` library
+- Redis for high-performance caching
+- Any database with ACID transactions
+
+Avoid file-based storage for production as it can lead to data corruption and doesn't handle concurrent access well.
+
+## Step 6: Add TypeScript Support (Optional)
+
+Create `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+Install TypeScript:
+
+```bash
+npm install --save-dev typescript @types/node @types/express
+```
+
+## Step 7: Run Your Server
+
+Compile and run:
+
+```bash
+npx tsc server.ts
+node server.js
+```
+
+Or run directly with ts-node:
+
+```bash
+npm install --save-dev ts-node
+npx ts-node server.ts
+```
+
+## Step 8: Test Your Server
+
+Test the health endpoint:
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+List available integrations:
+
+```bash
+curl http://localhost:3001/api/integrations
+```
+
+## Step 9: Add Security (Production)
+
+For production, add security configuration:
+
+```typescript
+const server = new DatabiteServer({
+  port: 3001,
+  engineConfig: {
+    connectors: [slack],
+    minutesBetweenSyncs: 10,
+  },
+  security: {
+    rateLimit: { windowMs: 15 * 60 * 1000, max: 100 },
+    allowedOrigins: ["https://yourdomain.com"],
+    enableHelmet: true,
+    enableRateLimit: true,
+  },
+});
+```
+
+## Next Steps
+
+- Connect your frontend using [@databite/connect](/packages/connect)
+- Add more connectors from [@databite/connectors](/packages/connectors)
+- Implement a database-backed connection store (PostgreSQL, MongoDB, etc.) for production
+- Deploy behind a reverse proxy with HTTPS
+
+## Troubleshooting
+
+**Server won't start?**
+- Check that your environment variables are set correctly
+- Ensure the port 3001 is not already in use
+- Verify your Slack app credentials are valid
+
+**Connector not working?**
+- Double-check your OAuth redirect URI matches exactly
+- Ensure your Slack app has the required scopes
+- Check the server logs for detailed error messages

@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 import { DatabiteServer } from "@databite/server";
-import { InMemoryAdapter } from "@databite/engine";
 import { slack } from "@databite/connectors";
 
 async function main() {
@@ -10,7 +9,7 @@ async function main() {
   const server = new DatabiteServer({
     port: 3001,
     engineConfig: {
-      schedulerAdapter: new InMemoryAdapter(),
+      connectors: [slack],
       minutesBetweenSyncs: 1,
     },
     // Security configuration
@@ -102,6 +101,9 @@ async function main() {
   console.log("  ✓ Request size limits (10mb)");
   console.log("  ✓ IP filtering");
   console.log("\n💡 Test with: curl http://localhost:3001/api/health");
+  console.log(
+    "\n⚠️  Note: Using in-memory storage - data will be lost on restart"
+  );
 
   // Graceful shutdown
   process.on("SIGINT", async () => {

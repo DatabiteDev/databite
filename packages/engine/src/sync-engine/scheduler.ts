@@ -1,16 +1,10 @@
-import {
-  SchedulerAdapter,
-  ScheduledJob,
-  SyncJobData,
-  ExecutionResult,
-} from "../types";
-import { SyncEngine } from "../engine";
+import { ScheduledJob, SyncJobData, ExecutionResult } from "./types";
+import { SyncEngine } from "./engine";
 
 /**
- * InMemoryAdapter - a simple adapter that runs the sync engine in memory
- * No dependencies, no external services
+ * Scheduler - a simple scheduler that manages the sync engines jobs in memory
  */
-export class InMemoryAdapter implements SchedulerAdapter {
+export class Scheduler {
   private jobs = new Map<string, ScheduledJob>();
   private timers = new Map<string, NodeJS.Timeout>();
   private engine: SyncEngine | null = null;
@@ -19,10 +13,6 @@ export class InMemoryAdapter implements SchedulerAdapter {
 
   setSyncEngine(engine: SyncEngine): void {
     this.engine = engine;
-  }
-
-  async initialize(): Promise<void> {
-    console.log("InMemoryAdapter initialized");
   }
 
   async scheduleJob(

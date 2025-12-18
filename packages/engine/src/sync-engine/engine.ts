@@ -1,52 +1,44 @@
 import { Connection, Connector, Integration } from "@databite/types";
 import {
-  SchedulerAdapter,
   SyncEngineConfig,
   ScheduledJob,
   ExecutionResult,
   SyncJobData,
 } from "./types";
-import { IntegrationRateLimiter } from "../rate-limiter/rate-limiter";
+import { RateLimiter } from "../rate-limiter/rate-limiter";
+import { Scheduler } from "./scheduler";
 
 /**
  * Engine for scheduling and executing syncs for connector connections.
- * Uses a pluggable adapter pattern for scheduling.
  */
 export class SyncEngine {
-  private adapter: SchedulerAdapter;
+  private scheduler: Scheduler;
   private minutesBetweenSyncs: number;
-  private getConnection: (id: string) => Connection<any> | undefined;
+  private getConnection: (id: string) => Promise<Connection<any> | undefined>;
   private getIntegration: (id: string) => Integration<any> | undefined;
   private getConnector: (id: string) => Connector<any, any> | undefined;
   private updateConnectionMetadata: (
     connectionId: string,
     metadata: Record<string, any>
   ) => Promise<void>;
-  private rateLimiter: IntegrationRateLimiter;
+  private rateLimiter: RateLimiter;
 
   constructor(config: SyncEngineConfig) {
-    this.adapter = config.adapter;
     this.minutesBetweenSyncs = config.minutesBetweenSyncs;
     this.getConnection = config.getConnection;
     this.getIntegration = config.getIntegration;
     this.getConnector = config.getConnector;
     this.updateConnectionMetadata = config.updateConnectionMetadata;
-    this.rateLimiter = config.rateLimiter || new IntegrationRateLimiter();
-    this.initialize();
-  }
-
-  /**
-   * Initialize the sync engine's adapter
-   */
-  private async initialize(): Promise<void> {
-    await this.adapter.initialize();
+    this.rateLimiter = config.rateLimiter || new RateLimiter();
+    this.scheduler = new Scheduler();
+    this.scheduler.setSyncEngine(this);
   }
 
   /**
    * Schedule syncs for a connector connection
    */
   async scheduleConnectionSyncs(connectionId: string): Promise<void> {
-    const connection = this.getConnection(connectionId);
+    const connection = await this.getConnection(connectionId);
     if (!connection) {
       throw new Error(`Connection '${connectionId}' not found`);
     }
@@ -65,7 +57,7 @@ export class SyncEngine {
       const jobId = `${connectionId}-${syncName}`;
       const schedule = this.minutesBetweenSyncs;
 
-      await this.adapter.scheduleJob(
+      await this.scheduler.scheduleJob(
         jobId,
         syncName,
         { connectionId, syncName },
@@ -82,7 +74,7 @@ export class SyncEngine {
    * Unschedule syncs for a connector connection
    */
   async unscheduleConnectionSyncs(connectionId: string): Promise<void> {
-    await this.adapter.unscheduleConnectionJobs(connectionId);
+    await this.scheduler.unscheduleConnectionJobs(connectionId);
     console.log(`Unscheduled syncs for connection '${connectionId}'`);
   }
 
@@ -90,14 +82,14 @@ export class SyncEngine {
    * Get all scheduled jobs
    */
   async getJobs(): Promise<ScheduledJob[]> {
-    return this.adapter.getJobs();
+    return this.scheduler.getJobs();
   }
 
   /**
    * Get jobs for a specific connection
    */
   async getJobsForConnection(connectionId: string): Promise<ScheduledJob[]> {
-    return this.adapter.getJobsForConnection(connectionId);
+    return this.scheduler.getJobsForConnection(connectionId);
   }
 
   /**
@@ -107,12 +99,12 @@ export class SyncEngine {
     connectionId: string,
     syncName: string
   ): Promise<ExecutionResult> {
-    return this.adapter.executeNow(syncName, { connectionId, syncName });
+    return this.scheduler.executeNow(syncName, { connectionId, syncName });
   }
 
   /**
-   * Execute a sync job (called by adapters)
-   * This is the core sync execution logic that adapters use
+   * Execute a sync job (called by the scheduler)
+   * This is the core sync execution logic that scheduler uses
    */
   async executeSyncJob(data: SyncJobData): Promise<ExecutionResult> {
     const { connectionId, syncName } = data;
@@ -123,7 +115,7 @@ export class SyncEngine {
     );
 
     // Get connection once
-    const connection = this.getConnection(connectionId);
+    const connection = await this.getConnection(connectionId);
     if (!connection) {
       throw new Error(`Connection '${connectionId}' not found`);
     }
@@ -239,6 +231,6 @@ export class SyncEngine {
    * Clean up resources
    */
   async destroy(): Promise<void> {
-    await this.adapter.destroy();
+    await this.scheduler.destroy();
   }
 }

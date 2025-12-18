@@ -1,42 +1,17 @@
 ---
-title: "Databite SDK"
-description: "Simple way to host a connector API server and connect from your frontend"
+title: "Introduction"
+description: "Databite is an integration library that eliminates months of boilerplate code."
 ---
 
 <img className="block rounded-md" src="/images/hero.png" alt="Databite SDK" />
 
-## Welcome to Databite SDK
+## Welcome to Databite
 
 Databite helps you self-host a simple API server for connectors and connect to it from your frontend. You run a server with `@databite/server`, then use `@databite/connect` in your app to authenticate users and create connections.
-
-## Why Databite?
-
-<CardGroup cols={2}>
-  <Card title="Server" icon="server" href="/packages/server">
-    Host a REST API that exposes connectors, integrations, connections, flows, and sync jobs
-  </Card>
-  <Card title="React Connect" icon="react" href="/packages/connect">
-    Use a drop-in modal to authenticate and create connections from your app
-  </Card>
-  <Card title="Build Connectors" icon="wrench" href="/packages/build">
-    Fluent API to define custom connectors and integrations
-  </Card>
-  <Card title="Sync Engine" icon="arrows-rotate" href="/packages/engine">
-    Optional scheduling and execution for sync jobs
-  </Card>
-</CardGroup>
 
 ## Quick Start
 
 Get up and running with Databite in minutes:
-
-```bash
-# Install main packages
-npm install @databite/server @databite/connect
-
-# Optional (custom connectors, sync, types)
-npm install @databite/build @databite/connectors @databite/engine @databite/types
-```
 
 <Steps>
   <Step title="Start your server">
@@ -49,23 +24,6 @@ npm install @databite/build @databite/connectors @databite/engine @databite/type
     Use the React modal to authenticate and create connections via your server
   </Step>
 </Steps>
-
-## Architecture
-
-The Databite SDK follows a modular architecture with clear separation of concerns:
-
-<AccordionGroup>
-  <Accordion title="Main Libraries">
-    - **@databite/server** - Express server with REST API
-    - **@databite/connect** - React components for client integration
-  </Accordion>
-  <Accordion title="Supporting Libraries">
-    - **@databite/build** - Fluent API to build connectors
-    - **@databite/connectors** - Pre-built connectors
-    - **@databite/engine** - Optional sync engine
-    - **@databite/types** - Shared TypeScript types
-  </Accordion>
-</AccordionGroup>
 
 ## Three-Tier Hierarchy
 

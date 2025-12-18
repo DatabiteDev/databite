@@ -3,7 +3,7 @@ export interface RateLimitConfig {
   windowMs: number;
 }
 
-export class IntegrationRateLimiter {
+export class RateLimiter {
   private limits = new Map<string, { count: number; resetTime: number }>();
 
   generateKey(

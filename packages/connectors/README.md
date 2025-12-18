@@ -2,21 +2,15 @@
 
 A comprehensive library of pre-built connectors for popular third-party APIs, built with the Databite SDK.
 
-## 📦 Package Structure
+## 📦 Project Structure
 
 ```
 connectors/
 ├── src/
-│   └── connectors/
-│       ├── index.ts                # Main export file for all connectors
-│       └── example-service/        # Example connector folder
-│           ├── index.ts            # Connector definition (entry point)
-│           ├── actions/            # Connector actions (e.g., API calls)
-│           │   ├── sendMessage.ts
-│           │   └── listChannels.ts
-│           └── syncs/              # Data synchronization handlers
-│               ├── syncUsers.ts
-│               └── syncMessages.ts
+│   ├── connectors/
+│   │   ├── index.ts                # Main export file for all connectors
+│   │   └── slack/                  # Slack connector implementation
+│   └── index.ts                    # Main package exports
 ├── dist/                           # Compiled JavaScript output
 ├── package.json
 └── README.md
@@ -36,20 +30,55 @@ npm install zod typescript
 
 ## 🎯 Overview
 
-The `@databite/connectors` package provides ready-to-use connectors for popular services.
+The `@databite/connectors` package provides ready-to-use connectors for popular services. Each connector includes authentication flow, connection management, type safety, and extensibility.
 
-Each connector includes:
+## 📚 API Reference
 
-- **Authentication Flow**: Built-in authentication flows
-- **Connection Management**: Automatic connection and refresh handling
-- **Type Safety**: Full TypeScript support with Zod schemas
-- **Extensibility**: Easy to extend with custom actions and syncs
+### Exported Connectors
+
+#### slack
+
+Pre-built Slack connector for workspace integration.
+
+```typescript
+import { slack } from "@databite/connectors";
+
+const slackConnector = slack;
+```
+
+### Connector Array
+
+All available connectors in an array.
+
+```typescript
+import { connectors } from "@databite/connectors";
+
+const availableConnectors = connectors; // Array of all connectors
+```
+
+## 💡 Usage Example
+
+```typescript
+import { slack } from "@databite/connectors";
+
+// Create an integration
+const integration = slack.createIntegration("My Slack Integration", {
+  clientId: process.env.SLACK_CLIENT_ID!,
+  clientSecret: process.env.SLACK_CLIENT_SECRET!,
+  redirectUri: process.env.SLACK_REDIRECT_URI!,
+  scopes: ["chat:write", "channels:read"],
+});
+
+// Use the connector
+const connector = slack;
+```
 
 ## 🔗 Related Packages
 
 - [@databite/build](./packages/build/) - Core connector builder SDK
 - [@databite/engine](./packages/engine/) - Data synchronization and execution engine
 - [@databite/types](./packages/types/) - Shared TypeScript types
+- [@databite/server](./packages/server/) - RESTful API server
 
 ## 📄 License
 

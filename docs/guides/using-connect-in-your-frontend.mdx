@@ -1,0 +1,305 @@
+---
+title: "Using @databite/connect in Your Frontend"
+description: "Guide to integrate Databite connectors into React applications using the connect library"
+---
+
+## Overview
+
+The `@databite/connect` package provides React components and hooks to seamlessly integrate Databite connectors into your web applications. This guide shows how to add authentication flows and connection management to your frontend.
+
+The package also includes utility functions for server communication, so you don't need to make manual API calls. All the examples below use these built-in utilities.
+
+## Prerequisites
+
+- A running Databite server (see [Setting Up Your First Server](/guides/setting-up-your-first-server))
+- React application (Next.js, Vite, or Create React App)
+- Your server's API URL
+
+## Step 1: Install Dependencies
+
+```bash
+npm install @databite/connect @databite/types
+```
+
+## Step 2: Set Up Environment Variables
+
+Add your server URL to your environment:
+
+```bash
+# .env.local
+NEXT_PUBLIC_DATABITE_API_URL=http://localhost:3001
+```
+
+## Step 3: Create a Connection Component
+
+Create a component to handle connector authentication:
+
+```tsx
+// components/ConnectButton.tsx
+import React, { useState } from "react";
+import { ConnectModal } from "@databite/connect";
+
+interface ConnectButtonProps {
+  integrationId: string;
+  onConnectionSuccess?: (connection: any) => void;
+}
+
+export function ConnectButton({ integrationId, onConnectionSuccess }: ConnectButtonProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        Connect Service
+      </button>
+
+      <ConnectModal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        integrationId={integrationId}
+        baseUrl={process.env.NEXT_PUBLIC_DATABITE_API_URL!}
+        onAuthSuccess={async (integration, connectionConfig) => {
+          // Save the connection to your backend
+          try {
+            const response = await fetch("/api/connections", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                integrationId: integration.id,
+                connectionConfig,
+              }),
+            });
+
+            if (response.ok) {
+              const connection = await response.json();
+              onConnectionSuccess?.(connection);
+              setIsOpen(false);
+            }
+          } catch (error) {
+            console.error("Failed to save connection:", error);
+          }
+        }}
+        onAuthError={(error) => {
+          console.error("Authentication failed:", error);
+        }}
+      />
+    </>
+  );
+}
+```
+
+## Step 4: Display Available Integrations
+
+Create a component to list and connect to available integrations:
+
+```tsx
+// components/IntegrationList.tsx
+import React, { useEffect, useState } from "react";
+import { ConnectButton } from "./ConnectButton";
+import { getIntegrationsWithConnectors } from "@databite/connect";
+
+interface IntegrationWithConnector {
+  connector: {
+    id: string;
+    name: string;
+    description?: string;
+  };
+  integration: {
+    id: string;
+    name: string;
+  };
+}
+
+export function IntegrationList() {
+  const [integrations, setIntegrations] = useState<IntegrationWithConnector[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getIntegrationsWithConnectors(process.env.NEXT_PUBLIC_DATABITE_API_URL!)
+      .then(data => {
+        setIntegrations(data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error("Failed to load integrations:", error);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div>Loading integrations...</div>;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Available Integrations</h2>
+      {integrations.map(({ connector, integration }) => (
+        <div key={integration.id} className="border p-4 rounded">
+          <h3 className="font-semibold">{integration.name}</h3>
+          <p className="text-gray-600">{connector.description}</p>
+          <ConnectButton
+            integrationId={integration.id}
+            onConnectionSuccess={(connection) => {
+              console.log("Connection created:", connection);
+              // Refresh your app state
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Step 5: Manage Existing Connections
+
+Create a component to view and manage connections:
+
+```tsx
+// components/ConnectionManager.tsx
+import React, { useEffect, useState } from "react";
+import { getConnections, removeConnection } from "@databite/connect";
+
+interface Connection {
+  id: string;
+  integrationId: string;
+  status: "active" | "inactive";
+  createdAt: string;
+  integration: {
+    name: string;
+    connector: { name: string };
+  };
+}
+
+export function ConnectionManager() {
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadConnections();
+  }, []);
+
+  const loadConnections = async () => {
+    try {
+      const data = await getConnections(process.env.NEXT_PUBLIC_DATABITE_API_URL!);
+      setConnections(data);
+    } catch (error) {
+      console.error("Failed to load connections:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteConnection = async (connectionId: string) => {
+    try {
+      const success = await removeConnection(process.env.NEXT_PUBLIC_DATABITE_API_URL!, connectionId);
+      if (success) {
+        await loadConnections(); // Refresh list
+      }
+    } catch (error) {
+      console.error("Failed to delete connection:", error);
+    }
+  };
+
+  if (loading) return <div>Loading connections...</div>;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Your Connections</h2>
+      {connections.length === 0 ? (
+        <p>No connections yet. Connect a service above!</p>
+      ) : (
+        connections.map(connection => (
+          <div key={connection.id} className="border p-4 rounded flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold">{connection.integration.name}</h3>
+              <p className="text-gray-600">Status: {connection.status}</p>
+              <p className="text-sm text-gray-500">
+                Created: {new Date(connection.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            <button
+              onClick={() => deleteConnection(connection.id)}
+              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Disconnect
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+```
+
+## Step 6: Use in Your App
+
+Put it all together in your main app:
+
+```tsx
+// app/page.tsx (Next.js example)
+import { IntegrationList } from "../components/IntegrationList";
+import { ConnectionManager } from "../components/ConnectionManager";
+
+export default function HomePage() {
+  return (
+    <div className="container mx-auto p-4 space-y-8">
+      <h1 className="text-2xl font-bold">Databite Integration Manager</h1>
+      <IntegrationList />
+      <ConnectionManager />
+    </div>
+  );
+}
+```
+
+## Step 7: Execute Actions (Optional)
+
+Once connected, you can execute actions on behalf of users:
+
+```tsx
+import { executeAction } from "@databite/connect";
+
+// Execute a Slack message action
+const sendMessage = async (connectionId: string, channel: string, text: string) => {
+  try {
+    const result = await executeAction(
+      process.env.NEXT_PUBLIC_DATABITE_API_URL!,
+      connectionId,
+      "sendMessage",
+      { channelId: channel, text }
+    );
+    console.log("Action result:", result);
+  } catch (error) {
+    console.error("Action failed:", error);
+  }
+};
+
+// Example usage
+sendMessage("conn-123", "#general", "Hello from my app!");
+```
+
+## Best Practices
+
+- Always handle authentication errors gracefully
+- Store connection IDs securely (not in localStorage for sensitive data)
+- Implement proper loading states and error boundaries
+- Use environment variables for API URLs
+- Validate user permissions before showing connection options
+
+## Troubleshooting
+
+**Modal not opening?**
+- Check that your integration ID is correct
+- Verify your server is running and accessible
+- Ensure CORS is configured properly on your server
+
+**Authentication failing?**
+- Check your OAuth redirect URIs match exactly
+- Verify your connector credentials are valid
+- Look at browser network tab for detailed error messages
+
+**Actions not working?**
+- Ensure the connection is active
+- Check that the action name matches exactly
+- Verify the connection has the required permissions

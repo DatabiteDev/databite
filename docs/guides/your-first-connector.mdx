@@ -1,11 +1,11 @@
 ---
 title: "Your First Connector"
-description: "Learn how to build your first connector with the Databite SDK"
+description: "Learn how to build your first connector with Databite by creating a Slack connector"
 ---
 
 ## Overview
 
-This guide will walk you through creating your first connector using the Databite SDK. We'll build a simple connector for a hypothetical API service that demonstrates the core concepts and patterns.
+This guide will walk you through creating your first connector using Databite. We'll build a Slack connector that can send messages and sync channel data, demonstrating the core concepts and patterns.
 
 ## Prerequisites
 
@@ -13,460 +13,381 @@ Before starting, make sure you have:
 
 - Node.js >= 16.0.0 installed
 - Basic knowledge of TypeScript
-- Understanding of REST APIs
+- A Slack app (we'll create one in the steps below)
 
-## Step 1: Installation
+## Step 1: Create a Slack App
 
-First, install the required packages:
+First, create a Slack app at [api.slack.com/apps](https://api.slack.com/apps):
+
+1. Click "Create New App" → "From scratch"
+2. Name your app (e.g., "My Databite Connector")
+3. Select your workspace
+4. Go to "OAuth & Permissions" in the sidebar
+5. Add these scopes: `chat:write`, `channels:read`, `users:read`
+6. Go to "App Home" and enable "Home Tab"
+7. Install the app to your workspace
+
+Copy your Client ID, Client Secret, and note your Redirect URLs.
+
+## Step 2: Installation
+
+Install the required packages:
 
 ```bash
-npm install @databite/build @databite/flow @databite/types zod
+npm install @databite/build zod
 ```
 
-## Step 2: Define Configuration Schemas
+## Step 3: Define Configuration Schemas
 
-Start by defining the configuration schemas for your connector:
+Create `schemas.ts` with the configuration schemas:
 
 ```typescript
 import { z } from "zod";
 
-// Integration configuration - set when creating an integration
-const integrationConfig = z.object({
-  apiKey: z.string().min(1, "API key is required"),
-  baseUrl: z.string().url("Must be a valid URL"),
-  timeout: z.number().min(1000).max(60000).default(30000),
+export const SlackIntegrationConfigSchema = z.object({
+  clientId: z.string(),
+  clientSecret: z.string(),
+  redirectUri: z.string(),
+  scopes: z.array(z.string()),
 });
 
-// Connection configuration - set during authentication
-const connectionConfig = z.object({
-  accessToken: z.string(),
-  refreshToken: z.string().optional(),
+export const SlackConnectionConfigSchema = z.object({
+  workspace: z.string(),
   userId: z.string(),
+  accessToken: z.string(),
+  teamId: z.string(),
+  teamName: z.string(),
 });
-```
-
-## Step 3: Create Authentication Flow
-
-Create an authentication flow using the Flow engine:
-
-```typescript
-import { createFlow } from "@databite/flow";
-
-const authFlow = createFlow("authenticate")
-  .form("getCredentials", {
-    title: "API Authentication",
-    description: "Enter your API credentials to connect",
-    fields: [
-      {
-        name: "apiKey",
-        label: "API Key",
-        type: "password",
-        required: true,
-        placeholder: "Enter your API key",
-      },
-      {
-        name: "baseUrl",
-        label: "Base URL",
-        type: "url",
-        required: true,
-        placeholder: "https://api.example.com",
-      },
-    ],
-  })
-  .http("validateCredentials", {
-    url: (input) => `${input.getCredentials.baseUrl}/auth/validate`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${input.getCredentials.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    returnType: {
-      accessToken: "",
-      refreshToken: "",
-      userId: "",
-    },
-  })
-  .display("showSuccess", {
-    title: "Authentication Successful!",
-    content: "Your credentials have been validated and you're now connected.",
-  })
-  .returns((context) => ({
-    accessToken: context.validateCredentials.accessToken,
-    refreshToken: context.validateCredentials.refreshToken,
-    userId: context.validateCredentials.userId,
-  }));
 ```
 
 ## Step 4: Create Actions
 
-Define the actions your connector will support:
+Create `actions/send-message.ts` for sending Slack messages:
 
 ```typescript
+import { z } from "zod";
 import { createAction } from "@databite/build";
+import { SlackConnectionConfigSchema } from "../schemas";
 
-const getUserAction = createAction({
-  label: "Get User",
-  description: "Fetch user information by ID",
-  inputSchema: z.object({
-    id: z.string().min(1, "User ID is required"),
-  }),
-  outputSchema: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    createdAt: z.string(),
-  }),
-  maxRetries: 3,
-  timeout: 30000,
-  handler: async (params, connection) => {
-    const response = await fetch(
-      `${connection.config.baseUrl}/users/${params.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${connection.config.accessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error(
-          "Authentication failed. Please check your credentials."
-        );
-      }
-      if (response.status === 404) {
-        throw new Error("User not found.");
-      }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
-  },
+export const SendMessageInputSchema = z.object({
+  channelId: z.string().describe("Slack channel ID (e.g., #general or C1234567890)"),
+  text: z.string().describe("Message text to send"),
 });
 
-const createUserAction = createAction({
-  label: "Create User",
-  description: "Create a new user",
-  inputSchema: z.object({
-    name: z.string().min(1, "Name is required"),
-    email: z.string().email("Must be a valid email"),
+export const SendMessageOutputSchema = z.object({
+  ok: z.boolean(),
+  channel: z.string(),
+  ts: z.string(),
+  message: z.object({
+    text: z.string(),
+    user: z.string().optional(),
   }),
-  outputSchema: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    createdAt: z.string(),
-  }),
+});
+
+export const sendMessage = createAction<
+  typeof SendMessageInputSchema,
+  typeof SendMessageOutputSchema,
+  typeof SlackConnectionConfigSchema
+>({
+  label: "Send Slack Message",
+  description: "Send a message to a Slack channel",
+  inputSchema: SendMessageInputSchema,
+  outputSchema: SendMessageOutputSchema,
   maxRetries: 3,
   timeout: 30000,
+
   handler: async (params, connection) => {
-    const response = await fetch(`${connection.config.baseUrl}/users`, {
+    const { channelId, text } = params;
+    const { accessToken } = connection.config;
+
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${connection.config.accessToken}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        channel: channelId,
+        text,
+      }),
     });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error(
-          "Authentication failed. Please check your credentials."
-        );
-      }
-      if (response.status === 409) {
-        throw new Error("User with this email already exists.");
-      }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const data = await response.json();
+
+    if (!data.ok) {
+      throw new Error(`Slack API error: ${data.error}`);
     }
 
-    return await response.json();
+    return data;
   },
 });
 ```
 
 ## Step 5: Create Syncs
 
-Define data synchronization operations:
+Create `syncs/fetch-messages.ts` for syncing channel messages:
 
 ```typescript
+import { z } from "zod";
 import { createSync } from "@databite/build";
+import { SlackConnectionConfigSchema } from "../schemas";
 
-const syncUsers = createSync({
-  label: "Sync Users",
-  description: "Synchronize all users from the API",
-  schedule: "0 2 * * *", // Daily at 2 AM
-  outputSchema: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
-      createdAt: z.string(),
-    })
-  ),
+export const FetchMessagesOutputSchema = z.array(
+  z.object({
+    ts: z.string(),
+    user: z.string(),
+    text: z.string(),
+    channel: z.string(),
+    timestamp: z.string(),
+  })
+);
+
+export const fetchMessages = createSync<
+  typeof FetchMessagesOutputSchema,
+  typeof SlackConnectionConfigSchema
+>({
+  label: "Fetch Slack Messages",
+  description: "Fetch recent messages from Slack channels",
+  schedule: "0 */6 * * *", // Every 6 hours
+  outputSchema: FetchMessagesOutputSchema,
   maxRetries: 3,
   timeout: 60000,
-  handler: async (connection) => {
-    const response = await fetch(`${connection.config.baseUrl}/users`, {
-      headers: {
-        Authorization: `Bearer ${connection.config.accessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  handler: async (connection) => {
+    const { accessToken } = connection.config;
+
+    // First get list of channels
+    const channelsResponse = await fetch(
+      "https://slack.com/api/conversations.list",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const channelsData = await channelsResponse.json();
+
+    if (!channelsData.ok) {
+      throw new Error(`Failed to fetch channels: ${channelsData.error}`);
     }
 
-    const data = await response.json();
-    return data.users || [];
+    const messages: z.infer<typeof FetchMessagesOutputSchema> = [];
+
+    // Fetch messages from each channel (limit to first 5 channels for demo)
+    for (const channel of channelsData.channels.slice(0, 5)) {
+      try {
+        const messagesResponse = await fetch(
+          `https://slack.com/api/conversations.history?channel=${channel.id}&limit=10`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        const messagesData = await messagesResponse.json();
+
+        if (messagesData.ok) {
+          for (const message of messagesData.messages) {
+            messages.push({
+              ts: message.ts,
+              user: message.user || "",
+              text: message.text || "",
+              channel: channel.name,
+              timestamp: new Date(parseFloat(message.ts) * 1000).toISOString(),
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch messages for channel ${channel.name}:`, error);
+      }
+    }
+
+    return messages;
   },
 });
 ```
 
 ## Step 6: Build the Connector
 
-Now put it all together to create your connector:
+Create `index.ts` and put it all together:
 
 ```typescript
 import { createConnector } from "@databite/build";
+import { z } from "zod";
+import { SlackIntegrationConfigSchema, SlackConnectionConfigSchema } from "./schemas";
+import { sendMessage } from "./actions/send-message";
+import { fetchMessages } from "./syncs/fetch-messages";
 
-const myConnector = createConnector()
-  .withIdentity("my-service", "My Service")
+export const slack = createConnector<
+  typeof SlackIntegrationConfigSchema,
+  typeof SlackConnectionConfigSchema
+>()
+  .withIdentity("slack", "Slack")
   .withVersion("1.0.0")
   .withAuthor("Your Name")
-  .withLogo("https://example.com/logo.png")
-  .withDescription("Connector for My Service API")
-  .withDocumentationUrl("https://docs.example.com")
-  .withIntegrationConfig(integrationConfig)
-  .withConnectionConfig(connectionConfig)
-  .withAuthenticationFlow(authFlow)
-  .withActions({
-    getUser: getUserAction,
-    createUser: createUserAction,
+  .withLogo("https://slack.com/img/icons/app-57.png")
+  .withDocumentationUrl("https://api.slack.com")
+  .withDescription("Slack connector for messaging and team communication")
+  .withIntegrationConfig(SlackIntegrationConfigSchema)
+  .withConnectionConfig(SlackConnectionConfigSchema)
+  .withCategories("communication")
+  .withTags("messaging", "team", "communication")
+  .withAuthenticationFlow("slackAuth", (flow) =>
+    flow
+      // Step 1: OAuth authentication
+      .oauth<"authenticate", { code: string }>("authenticate", {
+        authUrl: (input) => {
+          const state = Math.random().toString(36).substring(7);
+
+          const params = new URLSearchParams({
+            client_id: input.integration.clientId,
+            scope: input.integration.scopes.join(","),
+            redirect_uri: input.integration.redirectUri,
+            state: state,
+          });
+
+          return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
+        },
+        title: "Authorize Slack",
+        description: "Click below to open Slack and authorize this application",
+        buttonLabel: "Connect to Slack",
+        popupWidth: 600,
+        popupHeight: 800,
+        timeout: 300000, // 5 minutes
+        extractParams: (url) => ({
+          code: url.searchParams.get("code") || "",
+        }),
+      })
+
+      // Step 2: Exchange code for access token
+      .http("tokenExchange", {
+        url: "https://slack.com/api/oauth.v2.access",
+        method: "POST",
+        headers: () => ({
+          "Content-Type": "application/x-www-form-urlencoded",
+        }),
+        body: (ctx) =>
+          new URLSearchParams({
+            client_id: ctx.integration.clientId,
+            client_secret: ctx.integration.clientSecret,
+            code: ctx.authenticate.code,
+            redirect_uri: ctx.integration.redirectUri,
+          }).toString(),
+        returnType: {} as any,
+      })
+
+      // Step 3: Transform the response into our desired format
+      .transform<"result", z.infer<typeof SlackConnectionConfigSchema>>(
+        "result",
+        (ctx) => {
+          const { tokenExchange } = ctx;
+
+          if (!tokenExchange.ok) {
+            throw new Error("Failed to authenticate with Slack");
+          }
+
+          return {
+            workspace: tokenExchange.team.name,
+            userId: tokenExchange.authed_user.id,
+            accessToken: tokenExchange.access_token,
+            teamId: tokenExchange.team.id,
+            teamName: tokenExchange.team.name,
+          };
+        }
+      )
+
+      // Step 4: Show success message
+      .display("success", {
+        title: "Successfully Connected!",
+        content: (ctx) =>
+          `You've successfully connected to ${ctx.result.teamName}. You can now send messages and sync data from your Slack workspace.`,
+        continueLabel: "Done",
+      })
+      .returns((ctx) => ctx.result)
+  )
+  .withRefresh(async (connection, _integration) => {
+    // Slack tokens don't expire, so just return current config
+    return connection.config;
   })
-  .withSyncs({
-    syncUsers: syncUsers,
+  .withRateLimit({
+    requests: 100, // 100 requests per minute
+    windowMs: 60000, // 1 minute
+    strategy: "per-connection", // rate limit per connection
   })
-  .withTags("api", "users", "saas")
-  .withCategories("productivity")
+  .withActions({ "Send Message": sendMessage })
+  .withSyncs({ "Fetch Messages": fetchMessages })
   .build();
 ```
 
 ## Step 7: Test Your Connector
 
-Create a simple test to verify your connector works:
+Create a test file to verify your connector works:
 
 ```typescript
+import { slack } from "./index";
+
 // Test integration creation
-const integration = myConnector.createIntegration("Test Integration", {
-  apiKey: "test-api-key",
-  baseUrl: "https://api.example.com",
-  timeout: 30000,
+const integration = slack.createIntegration("Test Slack Integration", {
+  clientId: process.env.SLACK_CLIENT_ID!,
+  clientSecret: process.env.SLACK_CLIENT_SECRET!,
+  redirectUri: "http://localhost:3001/auth/slack/callback",
+  scopes: ["chat:write", "channels:read"],
 });
 
 console.log("Integration created:", integration);
 
-// Test action execution (you'll need a real connection for this)
-const connection = {
-  id: "conn-1",
-  integrationId: integration.id,
-  config: {
-    accessToken: "test-access-token",
-    userId: "user-123",
+// Test the connector metadata
+console.log("Connector info:", {
+  id: slack.id,
+  name: slack.name,
+  actions: Object.keys(slack.actions),
+  syncs: Object.keys(slack.syncs),
+});
+```
+
+## Step 8: Use in a Server
+
+Add your connector to a Databite server:
+
+```typescript
+import { DatabiteServer } from "@databite/server";
+import { slack } from "./slack-connector";
+
+const server = new DatabiteServer({
+  port: 3001,
+  engineConfig: {
+    connectors: [slack],
+    minutesBetweenSyncs: 60,
   },
-  status: "active",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-try {
-  const result = await myConnector.actions.getUser.handler(
-    { id: "user-123" },
-    connection
-  );
-  console.log("User fetched:", result);
-} catch (error) {
-  console.error("Error fetching user:", error.message);
-}
-```
-
-## Step 8: Use in a React Application
-
-If you're building a React application, you can use the Connect components:
-
-```tsx
-import { ConnectModal } from "@databite/connect";
-import { useState } from "react";
-
-function MyApp() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div>
-      <button onClick={() => setIsOpen(true)}>Connect to My Service</button>
-
-      <ConnectModal
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        integration={integration}
-        onAuthSuccess={(integration, config) => {
-          console.log("Connected successfully:", config);
-          // Save connection to your backend
-        }}
-        onAuthError={(error) => {
-          console.error("Connection failed:", error);
-          // Show error message to user
-        }}
-      />
-    </div>
-  );
-}
-```
-
-## Best Practices
-
-### 1. Error Handling
-
-Always provide meaningful error messages:
-
-```typescript
-handler: async (params, connection) => {
-  try {
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      switch (response.status) {
-        case 401:
-          throw new Error(
-            "Authentication failed. Please check your credentials."
-          );
-        case 403:
-          throw new Error(
-            "Access denied. You don't have permission to perform this action."
-          );
-        case 404:
-          throw new Error("Resource not found.");
-        case 429:
-          throw new Error("Rate limit exceeded. Please try again later.");
-        default:
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    }
-
-    return await response.json();
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error("Network error. Please check your connection.");
-    }
-    throw error;
-  }
-};
-```
-
-### 2. Input Validation
-
-Use Zod schemas for robust input validation:
-
-```typescript
-const inputSchema = z.object({
-  email: z.string().email("Must be a valid email address"),
-  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
-  age: z
-    .number()
-    .min(0, "Age must be positive")
-    .max(150, "Age must be realistic"),
-});
-```
-
-### 3. Timeout Configuration
-
-Set appropriate timeouts for different operations:
-
-```typescript
-// Quick operations
-const quickAction = createAction({
-  timeout: 10000, // 10 seconds
-  // ...
 });
 
-// Data-intensive operations
-const dataSync = createSync({
-  timeout: 300000, // 5 minutes
-  // ...
-});
-```
-
-### 4. Retry Logic
-
-Configure retry logic based on the operation type:
-
-```typescript
-const action = createAction({
-  maxRetries: 3, // Retry up to 3 times
-  // ...
-});
+server.addIntegration(integration);
+console.log("Server ready at http://localhost:3001");
 ```
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card
-    title="Authentication Flows"
-    icon="key"
-    href="/guides/authentication-flows"
-  >
-    Learn about different authentication patterns and flows
-  </Card>
-  <Card
-    title="Data Synchronization"
-    icon="arrows-rotate"
-    href="/guides/data-synchronization"
-  >
-    Set up automated data synchronization
-  </Card>
-  <Card
-    title="Custom Connectors"
-    icon="wrench"
-    href="/guides/custom-connectors"
-  >
-    Build more complex connectors with advanced features
-  </Card>
-  <Card
-    title="Testing Connectors"
-    icon="flask"
-    href="/guides/testing-connectors"
-  >
-    Learn how to test your connectors effectively
-  </Card>
-</CardGroup>
+- Add more actions (create channels, invite users, etc.)
+- Add more syncs (users, files, etc.)
+- Implement proper error handling and retries
+- Add webhook support for real-time updates
+- Contribute your connector to our repo for others to use
 
 ## Troubleshooting
 
-### Common Issues
+**OAuth not working?**
+- Verify your redirect URI matches exactly in Slack app settings
+- Check that your scopes are correct
+- Ensure the app is installed to your workspace
 
-<AccordionGroup>
-  <Accordion title="TypeScript Errors">
-    Make sure you have the correct types imported and your schemas are properly
-    defined.
-  </Accordion>
-  <Accordion title="Authentication Failures">
-    Check that your authentication flow is correctly configured and your API
-    credentials are valid.
-  </Accordion>
-  <Accordion title="Action Execution Errors">
-    Verify that your action handlers are properly implemented and handle errors
-    gracefully.
-  </Accordion>
-</AccordionGroup>
+**API calls failing?**
+- Check your access token is valid
+- Verify rate limits aren't exceeded
+- Look at Slack API documentation for correct endpoints
 
-### Getting Help
-
-If you run into issues:
-
-1. Check the [Common Issues guide](/guides/common-issues)
-2. Review the [Debugging guide](/guides/debugging)
-3. Join our [Discord community](https://discord.gg/5HZXYMdNST)
-4. Open an issue on [GitHub](https://github.com/DatabiteDev/databite/issues)
+**Build errors?**
+- Make sure all imports are correct
+- Check TypeScript types match your schemas
+- Verify Zod schemas are properly defined

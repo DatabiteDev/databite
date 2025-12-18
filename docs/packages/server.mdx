@@ -18,31 +18,17 @@ npm install express helmet express-rate-limit
 
 ```typescript
 import { DatabiteServer } from "@databite/server";
-import { InMemoryAdapter } from "@databite/engine";
-import { slack } from "@databite/connectors";
 
-async function main() {
-  const server = new DatabiteServer({
-    port: 3001,
-    engineConfig: {
-      schedulerAdapter: new InMemoryAdapter(),
-      minutesBetweenSyncs: 10,
-    },
-  });
+const server = new DatabiteServer({
+  port: 3001,
+  engineConfig: {
+    connectors: [],
+    minutesBetweenSyncs: 10,
+  },
+});
 
-  await server.addIntegration(
-    slack.createIntegration("Slack Integration", {
-      clientId: process.env.SLACK_CLIENT_ID!,
-      clientSecret: process.env.SLACK_CLIENT_SECRET!,
-      redirectUri: process.env.SLACK_REDIRECT_URI!,
-      scopes: ["chat:write", "channels:read"],
-    })
-  );
-
-  await server.start();
-}
-
-main().catch(console.error);
+// Add an integration
+await server.addIntegration(integration);
 ```
 
 ## Security (optional)
@@ -50,7 +36,7 @@ main().catch(console.error);
 ```typescript
 const server = new DatabiteServer({
   port: 3001,
-  engineConfig: { schedulerAdapter: new InMemoryAdapter(), minutesBetweenSyncs: 10 },
+  engineConfig: { connectors: [], minutesBetweenSyncs: 10 },
   security: {
     rateLimit: { windowMs: 15 * 60 * 1000, max: 100 },
     allowedOrigins: ["http://localhost:3000"],
@@ -175,8 +161,6 @@ curl -X POST http://localhost:3001/api/actions/execute/conn-1/sendMessage \
 
 - Restrict CORS to your app’s domains in production
 - Enable rate limits and security headers
-- Never log or return secrets
-- Use HTTPS behind a reverse proxy
 
 ## Related Packages
 

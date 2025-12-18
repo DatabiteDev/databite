@@ -1,24 +1,24 @@
 import { Connection, Integration, Connector } from "@databite/types";
-import { IntegrationRateLimiter } from "../rate-limiter/rate-limiter";
+import { RateLimiter } from "../rate-limiter/rate-limiter";
 
 export interface ActionExecutorConfig {
-  getConnection: (id: string) => Connection<any> | undefined;
+  getConnection: (id: string) => Promise<Connection<any> | undefined>;
   getIntegration: (id: string) => Integration<any> | undefined;
   getConnector: (id: string) => Connector<any, any> | undefined;
-  rateLimiter?: IntegrationRateLimiter;
+  rateLimiter?: RateLimiter;
 }
 
 export class ActionExecutor {
-  private getConnection: (id: string) => Connection<any> | undefined;
+  private getConnection: (id: string) => Promise<Connection<any> | undefined>;
   private getIntegration: (id: string) => Integration<any> | undefined;
   private getConnector: (id: string) => Connector<any, any> | undefined;
-  private rateLimiter: IntegrationRateLimiter;
+  private rateLimiter: RateLimiter;
 
   constructor(config: ActionExecutorConfig) {
     this.getConnection = config.getConnection;
     this.getIntegration = config.getIntegration;
     this.getConnector = config.getConnector;
-    this.rateLimiter = config.rateLimiter || new IntegrationRateLimiter();
+    this.rateLimiter = config.rateLimiter || new RateLimiter();
   }
 
   async executeAction(
@@ -34,7 +34,7 @@ export class ActionExecutor {
     const startTime = Date.now();
 
     try {
-      const connection = this.getConnection(connectionId);
+      const connection = await this.getConnection(connectionId);
       if (!connection) {
         throw new Error(`Connection '${connectionId}' not found`);
       }

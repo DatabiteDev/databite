@@ -5,7 +5,7 @@ description: "Shared TypeScript types and interfaces for the Databite SDK ecosys
 
 ## Overview
 
-The `@databite/types` package provides comprehensive TypeScript type definitions for the entire Databite SDK ecosystem. It includes types for connectors, integrations, connections, actions, and syncs, ensuring type safety across all packages.
+The `@databite/types` package provides comprehensive TypeScript type definitions for the Databite SDK ecosystem, including types for connectors, integrations, connections, flows, actions, and syncs.
 
 ## Installation
 
@@ -41,7 +41,8 @@ interface Connector<
   categories: ConnectorCategory[];
   integrationConfig: TIntegrationConfig;
   connectionConfig: TConnectionConfig;
-  // Optional refresh logic is supported by connectors
+  authenticationFlow: Flow<TConnectionConfig>;
+  refreshFlow: Flow<TConnectionConfig>;
   actions: Record<string, Action<any, any, TConnectionConfig>>;
   syncs: Record<string, Sync<any, TConnectionConfig>>;
   createIntegration: (
@@ -81,8 +82,6 @@ interface Connection<TConfig extends z.ZodType> {
   updatedAt: Date;
 }
 ```
-
-## Action Types
 
 ### Action
 
@@ -130,7 +129,7 @@ interface Sync<
 }
 ```
 
-## Enum Types
+## Enums
 
 ### ConnectionStatus
 
@@ -166,8 +165,30 @@ enum ConnectorCategory {
 }
 ```
 
+## Usage Example
+
+```typescript
+import { Connector, Integration, Connection } from "@databite/types";
+import { z } from "zod";
+
+// Define schemas
+const integrationConfig = z.object({
+  apiKey: z.string(),
+});
+
+const connectionConfig = z.object({
+  accessToken: z.string(),
+});
+
+// Use types for type safety
+function createMyConnector(): Connector<typeof integrationConfig, typeof connectionConfig> {
+  // Implementation
+}
+```
+
 ## Related Packages
 
 - [@databite/build](/packages/build) - Core connector builder SDK
 - [@databite/connectors](/packages/connectors) - Pre-built connector library
 - [@databite/engine](/packages/engine) - Data synchronization and execution engine
+- [@databite/server](/packages/server) - RESTful API server

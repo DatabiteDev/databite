@@ -5,7 +5,7 @@ description: "Minimal example showing how to run a Databite server"
 
 ## Overview
 
-This example shows a minimal Express-based Databite server that exposes REST endpoints for your frontend to use.
+This example shows a minimal Databite server that exposes REST endpoints for your frontend to use.
 
 ## Repository
 
@@ -21,14 +21,13 @@ The example server is available in our open-source repository:
 
 ## Steps
 
-1) Install dependencies
+1. Install dependencies
 
 ```bash
-npm install @databite/server @databite/engine @databite/connectors @databite/types
-npm install express helmet express-rate-limit
+npm install @databite/server
 ```
 
-2) Configure environment
+2. Configure environment
 
 ```bash
 # .env.local
@@ -37,18 +36,17 @@ SLACK_CLIENT_SECRET=your-slack-client-secret
 SLACK_REDIRECT_URI=http://localhost:3001/auth/slack/callback
 ```
 
-3) Run the server
+3. Run the server
 
 ```typescript
 import { DatabiteServer } from "@databite/server";
-import { InMemoryAdapter } from "@databite/engine";
 import { slack } from "@databite/connectors";
 
 async function main() {
   const server = new DatabiteServer({
     port: 3001,
     engineConfig: {
-      schedulerAdapter: new InMemoryAdapter(),
+      connectors: [slack],
       minutesBetweenSyncs: 10,
     },
   });
@@ -62,14 +60,13 @@ async function main() {
     })
   );
 
-  await server.start();
   console.log("Server running at http://localhost:3001");
 }
 
 main().catch(console.error);
 ```
 
-4) Test endpoints
+4. Test endpoints
 
 ```bash
 curl http://localhost:3001/api/health
@@ -77,5 +74,3 @@ curl http://localhost:3001/api/integrations
 ```
 
 Next, connect from your frontend using `@databite/connect`.
-
-

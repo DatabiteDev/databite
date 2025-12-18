@@ -1,6 +1,6 @@
 {
   "name": "@databite/connectors",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "A library of pre-built connectors built with the Databite SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -1,5 +1,11 @@
 # @databite/types
 
+## 6.0.0
+
+### Major Changes
+
+- Switched data providers for connection stores. Switched scheduler adapters for databites own internal scheduler to be default always
+
 ## 5.0.0
 
 ### Major Changes

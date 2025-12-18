@@ -1,5 +1,17 @@
 # example-webapp
 
+## 2.0.0
+
+### Major Changes
+
+- Switched data providers for connection stores. Switched scheduler adapters for databites own internal scheduler to be default always
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connect@4.0.0
+  - @databite/types@6.0.0
+
 ## 1.0.1
 
 ### Patch Changes

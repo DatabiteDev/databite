@@ -2,7 +2,7 @@
 
 Shared TypeScript types and interfaces for the Databite SDK ecosystem.
 
-## 📦 Package Structure
+## 📦 Project Structure
 
 ```
 types/
@@ -36,15 +36,9 @@ npm install zod typescript
 
 ## 🎯 Overview
 
-The `@databite/types` package provides comprehensive TypeScript type definitions for:
+The `@databite/types` package provides comprehensive TypeScript type definitions for the Databite SDK ecosystem, including types for connectors, integrations, connections, flows, actions, and syncs.
 
-- **Connectors**: Templates for building API integrations
-- **Integrations**: Instances of connectors with specific configurations
-- **Connections**: Active connections to external services
-- **Flows**: Workflow definitions for authentication and data processing
-- **Actions/Syncs**: Core connector components
-
-## 📚 Type Definitions
+## 📚 API Reference
 
 ### Core Types
 
@@ -110,38 +104,6 @@ interface Connection<TConfig extends z.ZodType> {
 }
 ```
 
-### Flow Types
-
-#### Flow
-
-Defines a workflow with blocks and execution order.
-
-```typescript
-interface Flow<
-  TConnectionConfig extends z.ZodType,
-  TBlocks = Record<string, FlowBlock<any, any, TConnectionConfig>>
-> {
-  name: string;
-  blocks: TBlocks;
-  blockOrder: string[];
-}
-```
-
-#### FlowBlock
-
-Individual block within a flow.
-
-```typescript
-interface FlowBlock<TInput, TOutput, TConnectionConfig extends z.ZodType> {
-  run: (
-    input: TInput,
-    connection: Connection<TConnectionConfig>
-  ) => Promise<TOutput>;
-}
-```
-
-### Action Types
-
 #### Action
 
 Defines an action that can be executed on a connection.
@@ -188,7 +150,7 @@ interface Sync<
 }
 ```
 
-### Enum Types
+### Enums
 
 #### ConnectionStatus
 
@@ -224,12 +186,33 @@ enum ConnectorCategory {
 }
 ```
 
+## 💡 Usage Example
+
+```typescript
+import { Connector, Integration, Connection } from "@databite/types";
+import { z } from "zod";
+
+// Define schemas
+const integrationConfig = z.object({
+  apiKey: z.string(),
+});
+
+const connectionConfig = z.object({
+  accessToken: z.string(),
+});
+
+// Use types for type safety
+function createMyConnector(): Connector<typeof integrationConfig, typeof connectionConfig> {
+  // Implementation
+}
+```
+
 ## 🔗 Related Packages
 
 - [@databite/build](./packages/build/) - Core connector builder SDK
-- [@databite/flow](./packages/flow/) - Flow engine for complex workflows
 - [@databite/connectors](./packages/connectors/) - Pre-built connector library
 - [@databite/engine](./packages/engine/) - Data synchronization and execution engine
+- [@databite/server](./packages/server/) - RESTful API server
 
 ## 📄 License
 

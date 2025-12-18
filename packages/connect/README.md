@@ -2,23 +2,16 @@
 
 React components and hooks for integrating Databite connectors into your web applications with seamless authentication flows.
 
-## 📦 Package Structure
+## 📦 Project Structure
 
 ```
 connect/
 ├── src/
 │   ├── components/
 │   │   ├── ConnectModal.tsx         # Main connection modal
-|   |   ├── FlowStepRenderer.tsx     # Renders flow steps
+│   │   ├── FlowStepRenderer.tsx     # Renders flow steps
+│   │   ├── handle-oauth-flow.tsx    # OAuth flow handling
 │   │   └── ui/                      # UI components
-│   │       ├── badge.tsx
-│   │       ├── button.tsx
-│   │       ├── card.tsx
-│   │       ├── dialog.tsx
-│   │       ├── form.tsx
-│   │       ├── input.tsx
-│   │       ├── label.tsx
-│   │       └── skeleton.tsx
 │   ├── lib/
 │   │   └── utils.ts                 # Utility functions
 │   ├── index.css                    # Styles
@@ -42,43 +35,30 @@ npm install react react-dom typescript
 
 ## 🎯 Overview
 
-The `@databite/connect` package provides React components and hooks for:
+The `@databite/connect` package provides React components and hooks for ConnectModal, UI Components, Flow Integration, Type Safety, and Form Validation.
 
-- **ConnectModal**: Modal dialog for connector authentication using flow-based UI
-- **useConnect**: Hook for managing connection state and modal interactions
-- **UI Components**: Pre-built form components with Tailwind CSS
-- **Flow Integration**: Seamless flow rendering for authentication
-- **Type Safety**: Full TypeScript support with automatic type inference
-- **Form Validation**: Built-in form validation using react-hook-form and Zod
+## 📚 API Reference
 
-## 📚 Components
+### Components
 
-### ConnectModal
+#### ConnectModal
 
-A modal dialog for authenticating with connectors using flow-based UI. The modal automatically renders the connector's authentication flow.
+A modal dialog for authenticating with connectors using flow-based UI.
 
 ```typescript
-import { ConnectModal } from "@databite/connect";
-import { Integration } from "@databite/types";
-
 interface ConnectModalProps {
-  /** Whether the modal is open */
   open: boolean;
-  /** Callback when the modal open state changes */
   onOpenChange: (open: boolean) => void;
-  /** Integration to display */
   integration: Integration<any>;
-  /** Callback when authentication is successful */
   onAuthSuccess: (
     integration: Integration<any>,
     connectionConfig: any
   ) => void | Promise<void>;
-  /** Callback when authentication fails */
   onAuthError?: (error: Error) => void;
 }
 ```
 
-#### Usage
+## 💡 Usage Example
 
 ```tsx
 import React, { useState } from "react";
@@ -97,24 +77,16 @@ function App() {
       integration,
       connectionConfig,
     });
-    // Save connection to your backend
-    await saveConnection(integration.id, connectionConfig);
     setIsModalOpen(false);
   };
 
   const handleAuthError = (error: Error) => {
     console.error("Authentication failed:", error);
-    // Show error message to user
-  };
-
-  const handleConnect = (integration: Integration<any>) => {
-    setIntegration(integration);
-    setIsModalOpen(true);
   };
 
   return (
     <div>
-      <button onClick={() => handleConnect(myIntegration)}>
+      <button onClick={() => setIsModalOpen(true)}>
         Connect to Service
       </button>
 

@@ -2,18 +2,20 @@
 
 A powerful data synchronization and execution engine for managing recurring sync operations, action execution, and data synchronization with automatic scheduling and execution.
 
-## 📦 Package Structure
+## 📦 Project Structure
 
 ```
 engine/
 ├── src/
 │   ├── databite-engine/
 │   │   ├── engine.ts            # Main DatabiteEngine class
+│   │   ├── types.ts             # Engine types and interfaces
+│   │   ├── in-memory-connection-store.ts # In-memory connection storage
 │   │   └── index.ts             # Public API exports
 │   ├── sync-engine/
 │   │   ├── engine.ts            # SyncEngine implementation
 │   │   ├── types.ts             # Sync engine types
-│   │   ├── adapters/            # Scheduler adapters
+│   │   ├── scheduler/           # Sync Jobs Scheduler
 │   │   └── index.ts             # Public API exports
 │   ├── action-executer/
 │   │   └── action-executer.ts   # Action execution logic
@@ -32,27 +34,12 @@ engine/
 ## 🚀 Installation
 
 ```bash
-npm install @databite/engine @databite/types @databite/connectors @databite/build
-```
-
-**Peer Dependencies:**
-
-```bash
-npm install zod typescript bullmq
+npm install @databite/engine
 ```
 
 ## 🎯 Overview
 
-The `@databite/engine` package provides a comprehensive synchronization and execution engine with:
-
-- **Automatic Scheduling**: Built-in job scheduling and execution
-- **Connection Management**: Automatic connection and integration management
-- **Action Execution**: Execute connector actions with rate limiting
-- **Provider Pattern**: Flexible data source integration
-- **Error Handling**: Built-in retry logic and error recovery
-- **Real-time Monitoring**: Job status and execution tracking
-- **Rate Limiting**: Built-in rate limiting for API calls
-- **Data Export**: Automatic data persistence and export
+The `@databite/engine` package provides a comprehensive synchronization and execution engine with automatic scheduling, connection management, action execution, provider pattern, error handling, real-time monitoring, rate limiting, and data export.
 
 ## 📚 API Reference
 
@@ -63,18 +50,27 @@ The `@databite/engine` package provides a comprehensive synchronization and exec
 The main class for managing data synchronization and execution operations.
 
 ```typescript
-import { DatabiteEngine } from "@databite/engine";
-
-const engine = new DatabiteEngine({
-  dataProvider: async () => ({ connections, integrations }),
-  dataExporter: async ({ connections, integrations }) => ({
-    success: true,
-    error: null,
-  }),
-  schedulerAdapter: new BullMQAdapter(),
-  minutesBetweenSyncs: 5,
-  refreshInterval: 5 * 60 * 1000, // 5 minutes
-});
+class DatabiteEngine {
+  constructor(config: EngineConfig)
+  addConnection(connection: Connection<any>): Promise<Connection<any>>
+  addIntegration(integration: Integration<any>): Promise<void>
+  getConnections(): Promise<Connection<any>[]>
+  getConnection(connectionId: string): Promise<Connection<any> | undefined>
+  removeConnection(connectionId: string): Promise<void>
+  getIntegrations(): Integration<any>[]
+  getConnectors(): Connector<any, any>[]
+  scheduleConnectionSyncs(connectionId: string): Promise<void>
+  unscheduleConnectionSyncs(connectionId: string): Promise<void>
+  executeSync(connectionId: string, syncName: string): Promise<ExecutionResult>
+  getScheduledJobs(): Promise<ScheduledJob[]>
+  getConnectionJobs(connectionId: string): Promise<ScheduledJob[]>
+  executeAction(connectionId: string, actionName: string, params: any): Promise<{ success: boolean; data?: any; error?: string; executionTime: number }>
+  startFlowSession(integrationId: string): Promise<any>
+  executeFlowStep(sessionId: string, userInput?: any): Promise<any>
+  getFlowSession(sessionId: string): Promise<any>
+  deleteFlowSession(sessionId: string): void
+  destroy(): Promise<void>
+}
 ```
 
 ### Configuration
@@ -85,144 +81,42 @@ Configuration options for the Databite engine.
 
 ```typescript
 interface EngineConfig {
-  customConnectors?: Connector<any, any>[];
-  dataProvider?: DataProvider;
-  dataExporter?: DataExporter;
-  refreshInterval?: number; // in milliseconds, default 5 minutes
-  schedulerAdapter: SchedulerAdapter;
+  connectors: Connector<any, any>[];
+  connectionStore?: ConnectionStore;
   minutesBetweenSyncs: number;
 }
 ```
 
-#### Provider Types
+#### ConnectionStore
+
+Interface for connection storage implementations.
 
 ```typescript
-type DataProvider = () => Promise<{
-  connections: Connection<any>[];
-  integrations: Integration<any>[];
-}>;
-
-type DataExporter = ({
-  connections,
-  integrations,
-}: {
-  connections: Connection<any>[];
-  integrations: Integration<any>[];
-}) => Promise<{ success: boolean; error: string | null }>;
-```
-
-#### ExecutionResult
-
-Result of executing a sync operation.
-
-```typescript
-interface ExecutionResult {
-  success: boolean;
-  data?: any;
-  error?: string;
-  executionTime: number;
-  timestamp: Date;
+interface ConnectionStore {
+  create(connection: Connection<any>): Promise<Connection<any>>;
+  read(connectionId: string): Promise<Connection<any> | undefined>;
+  readAll(): Promise<Connection<any>[]>;
+  update(connection: Connection<any>): Promise<Connection<any>>;
+  delete(connectionId: string): Promise<void>;
 }
 ```
 
-#### ScheduledJob
+#### InMemoryConnectionStore
 
-Represents a scheduled sync job.
+In-memory implementation of ConnectionStore.
 
 ```typescript
-interface ScheduledJob {
-  id: string;
-  connectionId: string;
-  syncName: string;
-  schedule: string;
-  nextRun: Date;
-  isActive: boolean;
+class InMemoryConnectionStore implements ConnectionStore {
+  create(connection: Connection<any>): Promise<Connection<any>>
+  read(connectionId: string): Promise<Connection<any> | undefined>
+  readAll(): Promise<Connection<any>[]>
+  update(connection: Connection<any>): Promise<Connection<any>>
+  delete(connectionId: string): Promise<void>
 }
-```
-
-### Core Methods
-
-#### Connection Management
-
-```typescript
-// Add a connection
-syncEngine.addConnection(connection: Connection<any>): void
-
-// Get a connection by ID
-syncEngine.getConnection(connectionId: string): Connection<any> | undefined
-
-// Add an integration
-syncEngine.addIntegration(integration: Integration<any>): void
-
-// Get an integration by name
-syncEngine.getIntegration(integrationId: string): Integration<any> | undefined
-
-// Get a connector by ID
-syncEngine.getConnector(connectorId: string): Connector<any, any> | undefined
-```
-
-#### Data Refresh
-
-```typescript
-// Refresh connections from provider
-await syncEngine.refreshConnections(): Promise<void>
-
-// Refresh integrations from provider
-await syncEngine.refreshIntegrations(): Promise<void>
-
-// Refresh all data
-await syncEngine.refreshAllData(): Promise<void>
-```
-
-#### Job Scheduling
-
-```typescript
-// Schedule syncs for a connection
-syncEngine.scheduleConnectionSyncs(connectionId: string): void
-
-// Unschedule syncs for a connection
-syncEngine.unscheduleConnectionSyncs(connectionId: string): void
-
-// Pause a scheduled job
-syncEngine.pauseJob(jobId: string): void
-
-// Resume a scheduled job
-syncEngine.resumeJob(jobId: string): void
-```
-
-#### Job Management
-
-```typescript
-// Get all scheduled jobs
-syncEngine.getJobs(): ScheduledJob[]
-
-// Get jobs for a specific connection
-syncEngine.getJobsForConnection(connectionId: string): ScheduledJob[]
-
-// Execute a sync manually
-await syncEngine.executeSync(connectionId: string, syncName: string): Promise<ExecutionResult>
-
-// Destroy the sync engine and clean up resources
-syncEngine.destroy(): void
 ```
 
 ### Types
 
-#### ScheduledJob
-
-Represents a scheduled sync job.
-
-```typescript
-interface ScheduledJob {
-  id: string;
-  connectionId: string;
-  syncName: string;
-  schedule: string;
-  nextRun: Date;
-  isActive: boolean;
-}
-```
-
 #### ExecutionResult
 
 Result of executing a sync operation.
@@ -235,6 +129,40 @@ interface ExecutionResult {
   executionTime: number;
   timestamp: Date;
 }
+```
+
+#### ScheduledJob
+
+Represents a scheduled sync job.
+
+```typescript
+interface ScheduledJob {
+  id: string;
+  connectionId: string;
+  syncName: string;
+  schedule: number;
+  nextRun?: Date;
+  isActive: boolean;
+  lastRun?: Date;
+  lastResult?: ExecutionResult;
+}
+```
+
+## 💡 Usage Example
+
+```typescript
+import { DatabiteEngine } from "@databite/engine";
+
+const engine = new DatabiteEngine({
+  connectors: [],
+  minutesBetweenSyncs: 5,
+});
+
+// Add an integration
+await engine.addIntegration(integration);
+
+// Add a connection
+await engine.addConnection(connection);
 ```
 
 ## 🔗 Related Packages
@@ -242,6 +170,7 @@ interface ExecutionResult {
 - [@databite/build](./packages/build/) - Core connector builder SDK
 - [@databite/connectors](./packages/connectors/) - Pre-built connector library
 - [@databite/types](./packages/types/) - Shared TypeScript types
+- [@databite/server](./packages/server/) - RESTful API server
 
 ## 📄 License
 

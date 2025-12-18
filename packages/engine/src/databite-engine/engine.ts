@@ -1,45 +1,11 @@
 import { Connection, Connector, Integration } from "@databite/types";
-import { connectors } from "@databite/connectors";
 import { SyncEngine } from "../sync-engine";
-import {
-  SchedulerAdapter,
-  ScheduledJob,
-  ExecutionResult,
-} from "../sync-engine/types";
-import { IntegrationRateLimiter } from "../rate-limiter/rate-limiter";
+import { ScheduledJob, ExecutionResult } from "../sync-engine/types";
+import { RateLimiter } from "../rate-limiter/rate-limiter";
 import { ActionExecutor } from "../action-executer/action-executer";
 import { FlowSessionManager } from "../flow-manager/flow-session-manager";
-
-/**
- * Provider method for fetching connections and integrations
- */
-export type DataProvider = () => Promise<{
-  connections: Connection<any>[];
-  integrations: Integration<any>[];
-}>;
-
-/**
- * Method that exports data from the Engine, used to permanently persist data from the Engine
- */
-export type DataExporter = ({
-  connections,
-  integrations,
-}: {
-  connections: Connection<any>[];
-  integrations: Integration<any>[];
-}) => Promise<{ success: boolean; error: string | null }>;
-
-/**
- * Configuration options for the SyncEngine
- */
-export interface EngineConfig {
-  customConnectors?: Connector<any, any>[];
-  dataProvider?: DataProvider;
-  dataExporter?: DataExporter;
-  refreshInterval?: number; // in milliseconds, default 5 minutes
-  schedulerAdapter: SchedulerAdapter;
-  minutesBetweenSyncs: number;
-}
+import { EngineConfig, ConnectionStore } from "./types";
+import { InMemoryConnectionStore } from "./in-memory-connection-store";
 
 /**
  * Engine for scheduling and executing syncs for connector connections.
@@ -49,44 +15,36 @@ export class DatabiteEngine {
   private syncEngine: SyncEngine;
   private actionExecutor: ActionExecutor;
   private flowSessionManager: FlowSessionManager;
-  private dataProvider: DataProvider | undefined;
-  private dataExporter: DataExporter | undefined;
-  private refreshInterval: number;
-  private refreshTimer: NodeJS.Timeout | undefined;
+  private connectionStore: ConnectionStore;
   private connectors: Map<string, Connector<any, any>> = new Map<
     string,
     Connector<any, any>
-  >(connectors.map((connector) => [connector.id, connector]));
-  private connections: Map<string, Connection<any>> = new Map<
-    string,
-    Connection<any>
   >();
   private integrations: Map<string, Integration<any>> = new Map<
     string,
     Integration<any>
   >();
-  private rateLimiter: IntegrationRateLimiter = new IntegrationRateLimiter();
+  private rateLimiter: RateLimiter = new RateLimiter();
 
   constructor(config: EngineConfig) {
-    // Initialize data providers
-    this.dataProvider = config.dataProvider;
-    // Initialize data exporter
-    this.dataExporter = config.dataExporter;
-    // Set refresh interval (default 5 minutes)
-    this.refreshInterval = config.refreshInterval ?? 5 * 60 * 1000;
+    // Store connection store
+    this.connectionStore =
+      config.connectionStore || new InMemoryConnectionStore();
 
-    // Add custom connectors to the connectors map
-    if (config.customConnectors) {
-      config.customConnectors.forEach((connector) => {
-        this.connectors.set(connector.id, connector);
-      });
+    // Validate that connectors array is provided
+    if (!config.connectors || config.connectors.length === 0) {
+      throw new Error("At least one connector must be provided");
     }
+
+    // Add all provided connectors to the connectors map
+    config.connectors.forEach((connector) => {
+      this.connectors.set(connector.id, connector);
+    });
 
     // Initialize Sync Engine
     this.syncEngine = new SyncEngine({
-      adapter: config.schedulerAdapter,
       minutesBetweenSyncs: config.minutesBetweenSyncs,
-      getConnection: (id) => this.connections.get(id),
+      getConnection: (id) => this.getConnection(id),
       getIntegration: (id) => this.integrations.get(id),
       getConnector: (id) => this.connectors.get(id),
       updateConnectionMetadata: (id, metadata) =>
@@ -94,12 +52,9 @@ export class DatabiteEngine {
       rateLimiter: this.rateLimiter,
     });
 
-    // Set the adapters sync engine
-    config.schedulerAdapter.setSyncEngine(this.syncEngine);
-
     // Initialize Action Executor
     this.actionExecutor = new ActionExecutor({
-      getConnection: (id) => this.connections.get(id),
+      getConnection: (id) => this.getConnection(id),
       getIntegration: (id) => this.integrations.get(id),
       getConnector: (id) => this.connectors.get(id),
       rateLimiter: this.rateLimiter,
@@ -110,56 +65,6 @@ export class DatabiteEngine {
 
     // Start the expired session cleanup
     this.startSessionCleanup();
-
-    // Initialize connections and integrations from data provider
-    if (this.dataProvider) {
-      this.loadData().then(() => {
-        // Start periodic data refresh if provider is available
-        this.startDataRefresh();
-      });
-    }
-  }
-
-  /**
-   * Load data from the data provider
-   */
-  private async loadData(): Promise<void> {
-    if (!this.dataProvider) return;
-
-    try {
-      const { connections, integrations } = await this.dataProvider();
-
-      this.connections = new Map<string, Connection<any>>(
-        connections.map((connection) => [connection.id, connection])
-      );
-
-      this.integrations = new Map<string, Integration<any>>(
-        integrations.map((integration) => [integration.id, integration])
-      );
-
-      console.log(
-        `Loaded ${connections.length} connections and ${integrations.length} integrations`
-      );
-    } catch (err) {
-      console.error(
-        "Failed to load connections and integrations from data provider:",
-        err
-      );
-      throw err;
-    }
-  }
-
-  /**
-   * Start periodic data refresh from provider
-   */
-  private startDataRefresh(): void {
-    if (!this.dataProvider || this.refreshTimer) return;
-
-    this.refreshTimer = setInterval(() => {
-      this.loadData().catch((err) => {
-        console.error("Failed to refresh data:", err);
-      });
-    }, this.refreshInterval);
   }
 
   /** Clean up expired sessions every 5 minutes*/
@@ -173,43 +78,9 @@ export class DatabiteEngine {
   }
 
   /**
-   * Stop periodic data refresh
-   */
-  private stopDataRefresh(): void {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = undefined;
-    }
-  }
-
-  /**
-   * Export current data using the data exporter
-   */
-  async exportData(): Promise<{ success: boolean; error: string | null }> {
-    if (!this.dataExporter) {
-      return {
-        success: false,
-        error: "No data exporter configured",
-      };
-    }
-
-    try {
-      return await this.dataExporter({
-        connections: Array.from(this.connections.values()),
-        integrations: Array.from(this.integrations.values()),
-      });
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-  }
-
-  /**
    * Add a connection to the engine
    */
-  async addConnection(connection: Connection<any>): Promise<void> {
+  async addConnection(connection: Connection<any>): Promise<Connection<any>> {
     // Check if connection's integration is supported
     const integration = this.getIntegrationById(connection.integrationId);
     if (!integration) {
@@ -219,18 +90,18 @@ export class DatabiteEngine {
     }
 
     // Check if connection already exists
-    if (this.connections.has(connection.id)) {
+    const existingConnection = await this.connectionStore.read(connection.id);
+    if (existingConnection) {
       throw new Error(`Connection ${connection.id} already exists`);
     }
 
-    // Add connection to the engine
-    this.connections.set(connection.id, connection);
+    // Create connection in the database
+    const createdConnection = await this.connectionStore.create(connection);
 
     // Schedule syncs for the new connection
     await this.scheduleConnectionSyncs(connection.id);
 
-    // Export data if exporter is configured
-    await this.exportData();
+    return createdConnection;
   }
 
   /**
@@ -240,7 +111,7 @@ export class DatabiteEngine {
     connectionId: string,
     metadata: Record<string, any>
   ): Promise<void> {
-    const connection = this.getConnection(connectionId);
+    const connection = await this.getConnection(connectionId);
     if (!connection) {
       throw new Error("Connection not found");
     }
@@ -248,30 +119,43 @@ export class DatabiteEngine {
     // Update metadata
     connection.metadata = { ...connection.metadata, ...metadata };
 
-    // Export data if exporter is configured
-    await this.exportData();
+    // Update in database
+    await this.connectionStore.update(connection);
+  }
+
+  /**
+   * Update an entire connection
+   */
+  async updateConnection(
+    connection: Connection<any>
+  ): Promise<Connection<any>> {
+    const existingConnection = await this.connectionStore.read(connection.id);
+    if (!existingConnection) {
+      throw new Error(`Connection ${connection.id} not found`);
+    }
+
+    // Update in database
+    return await this.connectionStore.update(connection);
   }
 
   /**
    * Remove a connection from the engine
    */
   async removeConnection(connectionId: string): Promise<void> {
-    if (!this.connections.has(connectionId)) {
+    const connection = await this.connectionStore.read(connectionId);
+    if (!connection) {
       throw new Error(`Connection ${connectionId} not found`);
     }
 
     // Unschedule syncs for the connection
     await this.unscheduleConnectionSyncs(connectionId);
 
-    // Remove connection
-    this.connections.delete(connectionId);
-
-    // Export data if exporter is configured
-    await this.exportData();
+    // Delete connection from database
+    await this.connectionStore.delete(connectionId);
   }
 
   /**
-   * Add an integration to the engine
+   * Add an integration to the engine (stored locally)
    */
   async addIntegration(integration: Integration<any>): Promise<void> {
     // Check if integration's connector is supported
@@ -285,11 +169,8 @@ export class DatabiteEngine {
       throw new Error(`Integration ${integration.id} already exists`);
     }
 
-    // Add integration to the engine
+    // Add integration to local storage
     this.integrations.set(integration.id, integration);
-
-    // Export data if exporter is configured
-    await this.exportData();
   }
 
   /**
@@ -301,9 +182,10 @@ export class DatabiteEngine {
     }
 
     // Check if any connections use this integration
-    const connectionsUsingIntegration = Array.from(
-      this.connections.values()
-    ).filter((conn) => conn.integrationId === integrationId);
+    const allConnections = await this.connectionStore.readAll();
+    const connectionsUsingIntegration = allConnections.filter(
+      (conn) => conn.integrationId === integrationId
+    );
 
     if (connectionsUsingIntegration.length > 0) {
       throw new Error(
@@ -311,11 +193,8 @@ export class DatabiteEngine {
       );
     }
 
-    // Remove integration
+    // Remove integration from local storage
     this.integrations.delete(integrationId);
-
-    // Export data if exporter is configured
-    await this.exportData();
   }
 
   /**
@@ -465,14 +344,14 @@ export class DatabiteEngine {
   }
 
   /**
-   * Get all connections
+   * Get all connections from the database
    */
-  getConnections(): Connection<any>[] {
-    return Array.from(this.connections.values());
+  async getConnections(): Promise<Connection<any>[]> {
+    return await this.connectionStore.readAll();
   }
 
   /**
-   * Get all integrations
+   * Get all integrations (stored locally)
    */
   getIntegrations(): Integration<any>[] {
     return Array.from(this.integrations.values());
@@ -486,10 +365,12 @@ export class DatabiteEngine {
   }
 
   /**
-   * Get a connection by ID
+   * Get a connection by ID from the database
    */
-  getConnection(connectionId: string): Connection<any> | undefined {
-    return this.connections.get(connectionId);
+  async getConnection(
+    connectionId: string
+  ): Promise<Connection<any> | undefined> {
+    return await this.connectionStore.read(connectionId);
   }
 
   /**
@@ -528,14 +409,10 @@ export class DatabiteEngine {
    * Clean up resources and stop the engine
    */
   async destroy(): Promise<void> {
-    // Stop data refresh
-    this.stopDataRefresh();
-
     // Destroy sync engine
     await this.syncEngine.destroy();
 
-    // Clear all maps
-    this.connections.clear();
+    // Clear local maps
     this.integrations.clear();
     this.connectors.clear();
   }
