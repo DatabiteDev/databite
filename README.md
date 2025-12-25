@@ -16,6 +16,7 @@ databite/
 │   ├── build/          # Core SDK for building connectors
 │   ├── connect/        # React components for UI integration
 │   ├── connectors/     # Pre-built connector library
+│   ├── dashboard/      # Web dashboard for monitoring server performance
 │   ├── engine/         # Data synchronization and execution engine
 │   ├── server/         # Express server with API endpoints
 │   ├── types/          # Shared TypeScript types
@@ -25,13 +26,8 @@ databite/
 
 ## 📦 Packages
 
-### Core Packages
-
 - **[@databite/build](./packages/build/)** - Core SDK for building connectors with fluent API
 - **[@databite/types](./packages/types/)** - Shared TypeScript types and interfaces
-
-### Integration Packages
-
 - **[@databite/connectors](./packages/connectors/)** - Library of pre-built connectors (Slack, Trello, etc.)
 - **[@databite/engine](./packages/engine/)** - Data synchronization and execution engine with scheduling
 - **[@databite/connect](./packages/connect/)** - React components for UI integration
@@ -43,10 +39,10 @@ databite/
 
 ```bash
 # Install core packages
-npm install @databite/build @databite/types
+npm install @databite/server @databite/connect
 
 # Install additional packages as needed
-npm install @databite/connectors @databite/engine @databite/connect @databite/server
+npm install @databite/connectors @databite/engine @databite/build @databite/types
 ```
 
 ### Basic Usage
@@ -62,18 +58,6 @@ const myConnector = createConnector()
   .withAuthor("Your Name")
   .withLogo("https://example.com/logo.png")
   .withDescription("Connector for My Service")
-  .withActions({
-    getData: createAction({
-      label: "Get Data",
-      description: "Fetch data from the service",
-      inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ data: z.any() }),
-      handler: async (params, connection) => {
-        // Your implementation
-        return { data: { id: params.id } };
-      },
-    }),
-  })
   .build();
 ```
 
@@ -81,18 +65,17 @@ const myConnector = createConnector()
 
 ### Three-Tier Hierarchy
 
-1. **Connector** - A template/blueprint that defines what properties and configurations are available
-2. **Integration** - An instance of a connector where specific values have been filled in for the properties and configs
+1. **Connector** - A template/blueprint that defines what properties and configurations are available for a service
+2. **Integration** - An instance of a connector where configuration values have been filled in
 3. **Connection** - When someone actually uses an integration to connect to a service
 
 ### Core Features
 
 - **🔧 Connector Builder**: Fluent API for defining connectors with full TypeScript support
-- **⚡ Flow Engine**: Execute complex authentication and data workflows with automatic type inference
-- **🔄 Sync Engine**: Handle recurring data synchronization with cron/interval scheduling
-- **📊 Context Manager**: Manage execution contexts and state across flows
+- **⚡ Auth Flow**: Execute complex authentication and data workflows with automatic type inference
+- **🔄 Sync Engine**: Handle recurring data synchronization with scheduling
 - **🎨 React Components**: Pre-built UI components for easy integration
-- **🚀 Express Server**: Ready-to-use Express server with RESTful API endpoints
+- **🚀 Server**: Ready-to-use server with RESTful API endpoints
 
 ## 📚 Documentation
 
@@ -128,50 +111,6 @@ pnpm run build:all
 
 # Run tests
 pnpm test
-```
-
-### Project Structure
-
-```
-databite/
-├── packages/
-│   ├── build/                    # Core SDK
-│   │   ├── src/
-│   │   │   └── connector-builder/ # Builder implementation
-│   │   ├── examples/             # Usage examples
-│   │   └── README.md
-│   ├── connect/                  # React components
-│   │   ├── src/
-│   │   │   ├── components/       # UI components
-│   │   │   └── lib/             # Utility functions
-│   │   └── README.md
-│   ├── connectors/               # Pre-built connectors
-│   │   ├── src/connectors/       # Connector implementations
-│   │   └── README.md
-│   ├── engine/                   # Data synchronization and execution engine
-│   │   ├── src/
-│   │   │   ├── sync-engine/      # Sync engine implementation
-│   │   │   ├── action-executer/  # Action execution logic
-│   │   │   ├── rate-limiter/     # Rate limiting functionality
-│   │   │   ├── databite-engine/  # Main engine implementation
-│   │   │   └── flow-manager/     # Flow session management
-│   │   └── README.md
-│   ├── server/                   # Express server
-│   │   ├── src/
-│   │   │   ├── server.ts         # Main server implementation
-│   │   │   └── utils.ts          # Utility functions
-│   │   └── README.md
-│   ├── types/                    # Shared types
-│   │   ├── src/types/            # Type definitions
-│   │   └── README.md
-│   ├── example-webapp/           # Example Next.js application
-│   │   ├── app/                  # Next.js app directory
-│   │   ├── components/           # Shared components
-│   │   └── README.md
-│   └── example-server/           # Example Express server
-│       ├── src/
-│       │   └── index.ts          # Server setup example
-│       └── README.md
 ```
 
 ## 🚀 Release Workflow

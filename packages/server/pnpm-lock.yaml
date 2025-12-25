@@ -1,0 +1,46 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@databite/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@databite/types':
+        specifier: workspace:*
+        version: link:../types
+      zod:
+        specifier: ^4.1.11
+        version: 4.2.1
+
+  ../..: {}
+
+  ../../../databite-webapp: {}
+
+  ../build: {}
+
+  ../connect: {}
+
+  ../connectors: {}
+
+  ../engine: {}
+
+  ../example-server: {}
+
+  ../example-webapp: {}
+
+  ../types: {}
+
+packages:
+
+  zod@4.2.1:
+    resolution: {integrity: sha512-0wZ1IRqGGhMP76gLqz8EyfBXKk0J2qo2+H3fi4mcUP/KtTocoX08nmIAHl1Z2kJIZbZee8KOpBCSNPRgauucjw==}
+
+snapshots:
+
+  zod@4.2.1: {}

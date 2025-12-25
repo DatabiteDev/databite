@@ -184,7 +184,3 @@ This example can be deployed anywhere that supports Next.js:
 ## 📄 License
 
 MIT License — see [LICENSE](../../LICENSE) for details.
-
-```
-
-```

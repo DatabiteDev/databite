@@ -1,5 +1,16 @@
 # @databite/connect
 
+## 5.0.0
+
+### Major Changes
+
+- Creation of dashboard package
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/types@7.0.0
+
 ## 4.0.0
 
 ### Major Changes

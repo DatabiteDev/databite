@@ -10,7 +10,6 @@ async function main() {
     port: 3001,
     engineConfig: {
       connectors: [slack],
-      minutesBetweenSyncs: 1,
     },
     // Security configuration
     security: {

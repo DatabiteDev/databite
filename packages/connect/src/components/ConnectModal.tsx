@@ -17,6 +17,8 @@ export interface ConnectModalProps {
   onOpenChange: (open: boolean) => void;
   /** Integration ID to authenticate */
   integrationId: string;
+  /** Interval in minutes between syncs for the connection*/
+  syncInterval: number;
   /** Base URL of the Databite server */
   baseUrl: string;
   /** Callback when authentication is successful and connection is saved */
@@ -29,6 +31,7 @@ export function ConnectModal({
   open,
   onOpenChange,
   integrationId,
+  syncInterval,
   baseUrl,
   onAuthSuccess,
   onAuthError,
@@ -162,6 +165,7 @@ export function ConnectModal({
           id: `conn_${integrationId}_${Date.now()}`,
           integrationId,
           connectorId: connectorId,
+          syncInterval,
           config: result.data,
         };
 

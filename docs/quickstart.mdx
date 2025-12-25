@@ -21,8 +21,7 @@ async function main() {
   const server = new DatabiteServer({
     port: 3001,
     engineConfig: {
-      connectors: [slack]
-      minutesBetweenSyncs: 10,
+      connectors: [slack],
     },
   });
 
@@ -43,7 +42,7 @@ main().catch(console.error);
 
 ## 2) Connect from your frontend
 
-Use the React modal to authenticate and create a connection via your server.
+Use the Connect Modal to authenticate and create a connection via your server.
 
 ```tsx
 import React, { useState } from "react";
@@ -58,19 +57,11 @@ export default function Page() {
       <ConnectModal
         open={open}
         onOpenChange={setOpen}
-        // If your client knows the integrationId and server URL:
         integrationId="slack-integration-id"
         baseUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}
-        onAuthSuccess={async (integration, connectionConfig) => {
-          // Persist connection to your backend
-          await fetch("/api/save-connection", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              integrationId: integration.id,
-              connectionConfig,
-            }),
-          });
+        syncInterval={10}
+        onAuthSuccess={async (connection) => {
+          console.log(connection.id)
         }}
         onAuthError={(e) => console.error(e)}
       />

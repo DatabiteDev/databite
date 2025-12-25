@@ -1,3 +1,4 @@
+import * as z from "zod";
 import { Connector, ConnectorCategory } from "@databite/types";
 
 // Type for sanitized connector metadata (API-safe)
@@ -48,6 +49,8 @@ export function sanitizeConnector(
       description: action.description,
       maxRetries: action.maxRetries,
       timeout: action.timeout,
+      inputSchema: z.toJSONSchema(action.inputSchema),
+      outputSchema: z.toJSONSchema(action.outputSchema),
     })),
     syncs: Object.entries(connector.syncs).map(([key, sync]) => ({
       id: sync.id,
@@ -56,6 +59,7 @@ export function sanitizeConnector(
       description: sync.description,
       maxRetries: sync.maxRetries,
       timeout: sync.timeout,
+      outputSchema: z.toJSONSchema(sync.outputSchema),
     })),
   };
 

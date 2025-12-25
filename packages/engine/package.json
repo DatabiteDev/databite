@@ -1,6 +1,6 @@
 {
   "name": "@databite/engine",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "A library for managing data synchronization and execution from Databite Connectors.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -57,7 +57,7 @@
   "dependencies": {
     "@databite/build": "workspace:*",
     "@databite/types": "workspace:*",
-    "zod": "^4.1.11"
+    "zod": "workspace:*"
   },
   "peerDependencies": {
     "typescript": ">=4.5.0"

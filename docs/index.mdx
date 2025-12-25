@@ -1,13 +1,10 @@
 ---
 title: "Introduction"
-description: "Databite is an integration library that eliminates months of boilerplate code."
+description: "Databite is a self-hosted integration library that eliminates months of boilerplate code. Powerful custom connector builder, pre-built connectors for popular services, and complete control over your infrastructure."
 ---
 
 <img className="block rounded-md" src="/images/hero.png" alt="Databite SDK" />
 
-## Welcome to Databite
-
-Databite helps you self-host a simple API server for connectors and connect to it from your frontend. You run a server with `@databite/server`, then use `@databite/connect` in your app to authenticate users and create connections.
 
 ## Quick Start
 
@@ -20,8 +17,8 @@ Get up and running with Databite in minutes:
   <Step title="Add integrations">
     Add built-in or custom connectors and create integrations on your server
   </Step>
-  <Step title="Connect from your app">
-    Use the React modal to authenticate and create connections via your server
+  <Step title="Manage or connect">
+    Use the self-hosted dashboard to manage everything, or integrate `@databite/connect` into your app for user connections
   </Step>
 </Steps>
 
@@ -29,15 +26,18 @@ Get up and running with Databite in minutes:
 
 Databite uses a clear three-tier hierarchy for managing integrations:
 
-1. **Connector** - A template/blueprint that defines what properties and configurations are available
-2. **Integration** - An instance of a connector where specific values have been filled in
-3. **Connection** - When someone actually uses an integration to connect to a service
+1. **Connector** - A template/blueprint that defines what properties and configurations are available for a service.
+2. **Integration** - An instance of a connector where configuration values have been filled in.
+3. **Connection** - When someone actually uses an integration to connect to a service.
 
 ## What's Next?
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Stand up a server and connect from your app in minutes
+  </Card>
+  <Card title="Dashboard" icon="dashboard" href="/guides/hosting-the-dashboard">
+    Self-host a management dashboard for your server
   </Card>
   <Card title="Server API" icon="book" href="/packages/server">
     Explore server setup and API endpoints

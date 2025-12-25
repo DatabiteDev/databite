@@ -1,5 +1,5 @@
 ---
-title: "Setting Up Your First Databite Server"
+title: "Your First Databite Server"
 description: "Step-by-step guide to create and run your first Databite server with connectors"
 ---
 
@@ -28,14 +28,7 @@ npm init -y
 Install the core Databite packages:
 
 ```bash
-npm install @databite/server @databite/engine @databite/types
-npm install express helmet express-rate-limit
-```
-
-Install a connector (Slack example):
-
-```bash
-npm install @databite/connectors
+npm install @databite/server @databite/engine @databite/connectors @databite/types
 ```
 
 ## Step 3: Create Environment Configuration
@@ -59,12 +52,10 @@ import { slack } from "@databite/connectors";
 
 async function main() {
   // Create server with basic configuration
-  // Note: connectionStore defaults to InMemoryConnectionStore (data lost on restart)
   const server = new DatabiteServer({
     port: 3001,
     engineConfig: {
       connectors: [slack],
-      minutesBetweenSyncs: 10,
     },
   });
 
@@ -77,6 +68,9 @@ async function main() {
       scopes: ["chat:write", "channels:read"],
     })
   );
+
+  // Start the server
+  await server.start();
 
   console.log("🚀 Databite server running at http://localhost:3001");
 }
@@ -97,7 +91,8 @@ The current setup uses `InMemoryConnectionStore`, which:
 
 ### Adding a Persistent Store
 
-For production, implement the `ConnectionStore` interface with your database of choice:
+- For production, implement the `ConnectionStore` interface with your database of choice:
+- Avoid file-based storage for production as it can lead to data corruption and doesn't handle concurrent access well.
 
 ```typescript
 import { DatabiteServer, ConnectionStore, Connection } from "@databite/server";
@@ -110,8 +105,8 @@ class PostgresConnectionStore implements EngineConnectionStore {
   async create(connection: Connection<any>): Promise<Connection<any>> {
     // Insert into your database
     const result = await this.db.query(
-      'INSERT INTO connections (id, integration_id, config, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [connection.id, connection.integrationId, JSON.stringify(connection.config), connection.status, connection.createdAt, connection.updatedAt]
+      'INSERT INTO connections (id, integration_id, connector_id, config, sync_interval, active_syncs, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [connection.id, connection.integrationId, connection.connectorId, JSON.stringify(connection.config), connection.syncInterval, JSON.stringify(connection.activeSyncs || []), JSON.stringify(connection.metadata || {}), new Date(), new Date()]
     );
     return result.rows[0];
   }
@@ -122,17 +117,36 @@ class PostgresConnectionStore implements EngineConnectionStore {
     return result.rows[0];
   }
 
-  async readAll(): Promise<Connection<any>[]> {
-    // Select all from your database
-    const result = await this.db.query('SELECT * FROM connections');
-    return result.rows;
+  async readAll(params?: { page?: number; limit?: number }): Promise<{ data: Connection<any>[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }> {
+    // Select all from your database with pagination
+    const page = params?.page || 1;
+    const limit = params?.limit || 10;
+    const offset = (page - 1) * limit;
+    
+    const countResult = await this.db.query('SELECT COUNT(*) FROM connections');
+    const total = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(total / limit);
+    
+    const result = await this.db.query('SELECT * FROM connections ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
+    
+    return {
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async update(connection: Connection<any>): Promise<Connection<any>> {
     // Update in your database
     const result = await this.db.query(
-      'UPDATE connections SET config = $1, status = $2, updated_at = $3 WHERE id = $4 RETURNING *',
-      [JSON.stringify(connection.config), connection.status, connection.updatedAt, connection.id]
+      'UPDATE connections SET config = $1, sync_interval = $2, active_syncs = $3, metadata = $4, updated_at = $5 WHERE id = $6 RETURNING *',
+      [JSON.stringify(connection.config), connection.syncInterval, JSON.stringify(connection.activeSyncs || []), JSON.stringify(connection.metadata || {}), new Date(), connection.id]
     );
     return result.rows[0];
   }
@@ -149,60 +163,19 @@ const server = new DatabiteServer({
   engineConfig: {
     connectors: [slack],
     connectionStore: new PostgresConnectionStore(dbClient),
-    minutesBetweenSyncs: 10,
   },
 });
 ```
 
-**Recommended databases:**
-- PostgreSQL with `pg` library
-- MySQL with `mysql2` library  
-- MongoDB with `mongodb` library
-- Redis for high-performance caching
-- Any database with ACID transactions
-
-Avoid file-based storage for production as it can lead to data corruption and doesn't handle concurrent access well.
-
-## Step 6: Add TypeScript Support (Optional)
-
-Create `tsconfig.json`:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
-}
-```
-
-Install TypeScript:
-
-```bash
-npm install --save-dev typescript @types/node @types/express
-```
-
-## Step 7: Run Your Server
-
-Compile and run:
-
-```bash
-npx tsc server.ts
-node server.js
-```
-
-Or run directly with ts-node:
+## Step 6: Run Your Server
+You can run your server directly with ts-node:
 
 ```bash
 npm install --save-dev ts-node
 npx ts-node server.ts
 ```
 
-## Step 8: Test Your Server
+## Step 7: Test Your Server
 
 Test the health endpoint:
 
@@ -225,7 +198,6 @@ const server = new DatabiteServer({
   port: 3001,
   engineConfig: {
     connectors: [slack],
-    minutesBetweenSyncs: 10,
   },
   security: {
     rateLimit: { windowMs: 15 * 60 * 1000, max: 100 },
@@ -240,17 +212,3 @@ const server = new DatabiteServer({
 
 - Connect your frontend using [@databite/connect](/packages/connect)
 - Add more connectors from [@databite/connectors](/packages/connectors)
-- Implement a database-backed connection store (PostgreSQL, MongoDB, etc.) for production
-- Deploy behind a reverse proxy with HTTPS
-
-## Troubleshooting
-
-**Server won't start?**
-- Check that your environment variables are set correctly
-- Ensure the port 3001 is not already in use
-- Verify your Slack app credentials are valid
-
-**Connector not working?**
-- Double-check your OAuth redirect URI matches exactly
-- Ensure your Slack app has the required scopes
-- Check the server logs for detailed error messages

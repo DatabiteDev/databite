@@ -1,5 +1,5 @@
 import { Connection } from "@databite/types";
-import { ConnectionStore } from "./types";
+import { ConnectionStore, PaginationParams, PaginatedResponse } from "./types";
 
 /**
  * Simple in-memory implementation of ConnectionStore
@@ -20,8 +20,35 @@ export class InMemoryConnectionStore implements ConnectionStore {
     return this.connections.get(connectionId) || undefined;
   }
 
-  async readAll(): Promise<Connection<any>[]> {
-    return Array.from(this.connections.values());
+  async readAll(
+    params?: PaginationParams
+  ): Promise<PaginatedResponse<Connection<any>>> {
+    const allConnections = Array.from(this.connections.values());
+    const total = allConnections.length;
+
+    // Default pagination values
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 10;
+
+    // Calculate pagination
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    // Slice the data for the current page
+    const data = allConnections.slice(startIndex, endIndex);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async update(connection: Connection<any>): Promise<Connection<any>> {

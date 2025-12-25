@@ -19,7 +19,7 @@ export interface ScheduledJob {
   id: string;
   connectionId: string;
   syncName: string;
-  schedule: number; // Number of minutes between syncs
+  syncInterval: number; // Number of minutes between syncs
   nextRun?: Date;
   isActive: boolean;
   lastRun?: Date;
@@ -45,6 +45,5 @@ export interface SyncEngineConfig {
     connectionId: string,
     metadata: Record<string, any>
   ) => Promise<void>;
-  minutesBetweenSyncs: number;
   rateLimiter: RateLimiter;
 }

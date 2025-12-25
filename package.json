@@ -6,7 +6,7 @@
   "author": "Databite",
   "packageManager": "pnpm@10.18.1",
   "scripts": {
-    "build:all": "turbo run build --filter=!example-webapp --filter=!example-server",
+    "build:all": "turbo run build --filter=!example-webapp --filter=!example-server --filter=!dashboard",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build:all && pnpm changeset version && pnpm -r publish"
@@ -14,11 +14,17 @@
   "workspaces": [
     "packages/*"
   ],
+  "pnpm": {
+    "overrides": {
+      "zod": "^4.1.11"
+    }
+  },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.2",
-    "turbo": "^2.5.8"
+    "turbo": "^2.5.8",
+    "zod": "^4.1.11"
   },
   "dependencies": {
     "@testing-library/react": "^16.3.0"

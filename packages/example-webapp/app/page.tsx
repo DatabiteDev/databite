@@ -45,10 +45,10 @@ export default function App() {
 
   const fetchConnections = async () => {
     const fetchedConnections = await getConnections(apiUrl);
-    setConnections(fetchedConnections);
+    setConnections(fetchedConnections.data);
 
     const map = new Map<string, ConnectorMetadata>();
-    for (const conn of fetchedConnections) {
+    for (const conn of fetchedConnections.data) {
       if (!map.has(conn.connectorId)) {
         const connector = await getConnector(apiUrl, conn.connectorId);
         if (connector) {
@@ -102,6 +102,7 @@ export default function App() {
             onOpenChange={setIsModalOpen}
             integrationId={integration.integration.id}
             baseUrl={apiUrl}
+            syncInterval={1}
             onAuthSuccess={handleAuthSuccess}
             onAuthError={handleAuthError}
           />

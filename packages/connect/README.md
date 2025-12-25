@@ -1,6 +1,6 @@
 # @databite/connect
 
-React components and hooks for integrating Databite connectors into your web applications with seamless authentication flows.
+React component for integrating Databite connectors into your web applications with seamless authentication flows.
 
 ## 📦 Project Structure
 
@@ -12,8 +12,8 @@ connect/
 │   │   ├── FlowStepRenderer.tsx     # Renders flow steps
 │   │   ├── handle-oauth-flow.tsx    # OAuth flow handling
 │   │   └── ui/                      # UI components
-│   ├── lib/
-│   │   └── utils.ts                 # Utility functions
+│   ├── utils/
+│   │   └── server-actions.ts        # Server functions
 │   ├── index.css                    # Styles
 │   └── index.ts                     # Main exports
 ├── dist/                            # Compiled output
@@ -50,10 +50,8 @@ interface ConnectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   integration: Integration<any>;
-  onAuthSuccess: (
-    integration: Integration<any>,
-    connectionConfig: any
-  ) => void | Promise<void>;
+  syncInterval: number;
+  onAuthSuccess: (connection) => void | Promise<void>;
   onAuthError?: (error: Error) => void;
 }
 ```
@@ -69,14 +67,8 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [integration, setIntegration] = useState<Integration<any> | null>(null);
 
-  const handleAuthSuccess = async (
-    integration: Integration<any>,
-    connectionConfig: any
-  ) => {
-    console.log("Authentication successful:", {
-      integration,
-      connectionConfig,
-    });
+  const handleAuthSuccess = async (connection) => {
+    console.log(connection.id);
     setIsModalOpen(false);
   };
 
@@ -95,6 +87,7 @@ function App() {
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
           integration={integration}
+          syncInterval={5}
           onAuthSuccess={handleAuthSuccess}
           onAuthError={handleAuthError}
         />

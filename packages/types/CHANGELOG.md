@@ -1,5 +1,11 @@
 # @databite/types
 
+## 7.0.0
+
+### Major Changes
+
+- Creation of dashboard package
+
 ## 6.0.0
 
 ### Major Changes

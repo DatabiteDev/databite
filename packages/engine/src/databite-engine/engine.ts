@@ -4,7 +4,12 @@ import { ScheduledJob, ExecutionResult } from "../sync-engine/types";
 import { RateLimiter } from "../rate-limiter/rate-limiter";
 import { ActionExecutor } from "../action-executer/action-executer";
 import { FlowSessionManager } from "../flow-manager/flow-session-manager";
-import { EngineConfig, ConnectionStore } from "./types";
+import {
+  EngineConfig,
+  ConnectionStore,
+  PaginationParams,
+  PaginatedResponse,
+} from "./types";
 import { InMemoryConnectionStore } from "./in-memory-connection-store";
 
 /**
@@ -43,7 +48,6 @@ export class DatabiteEngine {
 
     // Initialize Sync Engine
     this.syncEngine = new SyncEngine({
-      minutesBetweenSyncs: config.minutesBetweenSyncs,
       getConnection: (id) => this.getConnection(id),
       getIntegration: (id) => this.integrations.get(id),
       getConnector: (id) => this.connectors.get(id),
@@ -95,11 +99,17 @@ export class DatabiteEngine {
       throw new Error(`Connection ${connection.id} already exists`);
     }
 
-    // Create connection in the database
+    // Add connection to the connection store
     const createdConnection = await this.connectionStore.create(connection);
 
-    // Schedule syncs for the new connection
-    await this.scheduleConnectionSyncs(connection.id);
+    // Schedule only the active syncs
+    if (connection.activeSyncs && connection.activeSyncs.length > 0) {
+      await this.scheduleConnectionSyncs(
+        connection.id,
+        connection.syncInterval,
+        connection.activeSyncs
+      );
+    }
 
     return createdConnection;
   }
@@ -119,7 +129,7 @@ export class DatabiteEngine {
     // Update metadata
     connection.metadata = { ...connection.metadata, ...metadata };
 
-    // Update in database
+    // Update connection store
     await this.connectionStore.update(connection);
   }
 
@@ -134,7 +144,7 @@ export class DatabiteEngine {
       throw new Error(`Connection ${connection.id} not found`);
     }
 
-    // Update in database
+    // Update connection store
     return await this.connectionStore.update(connection);
   }
 
@@ -148,9 +158,9 @@ export class DatabiteEngine {
     }
 
     // Unschedule syncs for the connection
-    await this.unscheduleConnectionSyncs(connectionId);
+    await this.unscheduleAllConnectionSyncs(connectionId);
 
-    // Delete connection from database
+    // Delete connection from connection store
     await this.connectionStore.delete(connectionId);
   }
 
@@ -183,7 +193,7 @@ export class DatabiteEngine {
 
     // Check if any connections use this integration
     const allConnections = await this.connectionStore.readAll();
-    const connectionsUsingIntegration = allConnections.filter(
+    const connectionsUsingIntegration = allConnections.data.filter(
       (conn) => conn.integrationId === integrationId
     );
 
@@ -198,17 +208,147 @@ export class DatabiteEngine {
   }
 
   /**
-   * Schedule syncs for a connection
+   * Activate a sync for a connection (schedule it to run)
    */
-  async scheduleConnectionSyncs(connectionId: string): Promise<void> {
-    return this.syncEngine.scheduleConnectionSyncs(connectionId);
+  async activateSync(
+    connectionId: string,
+    syncName: string,
+    syncInterval?: number
+  ): Promise<void> {
+    const connection = await this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection ${connectionId} not found`);
+    }
+
+    const integration = this.getIntegrationById(connection.integrationId);
+    if (!integration) {
+      throw new Error(`Integration ${connection.integrationId} not found`);
+    }
+
+    const connector = this.getConnectorById(integration.connectorId);
+    if (!connector) {
+      throw new Error(`Connector ${integration.connectorId} not found`);
+    }
+
+    // Verify sync exists
+    if (!connector.syncs[syncName]) {
+      throw new Error(
+        `Sync '${syncName}' not found in connector '${connector.id}'`
+      );
+    }
+
+    // Initialize activeSyncs if not present
+    if (!connection.activeSyncs) {
+      connection.activeSyncs = [];
+    }
+
+    // Check if already active
+    if (connection.activeSyncs.includes(syncName)) {
+      throw new Error(`Sync '${syncName}' is already active`);
+    }
+
+    // Add to active syncs
+    connection.activeSyncs.push(syncName);
+    await this.connectionStore.update(connection);
+
+    // Schedule the sync
+    if (syncInterval) {
+      await this.syncEngine.scheduleConnectionSync(
+        connectionId,
+        syncName,
+        syncInterval
+      );
+    } else {
+      await this.syncEngine.scheduleConnectionSync(connectionId, syncName);
+    }
+
+    console.log(
+      `Activated sync '${syncName}' for connection '${connectionId}'`
+    );
   }
 
   /**
-   * Unschedule syncs for a connection
+   * Deactivate a sync for a connection (unschedule it)
    */
-  async unscheduleConnectionSyncs(connectionId: string): Promise<void> {
-    return this.syncEngine.unscheduleConnectionSyncs(connectionId);
+  async deactivateSync(connectionId: string, syncName: string): Promise<void> {
+    const connection = await this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection ${connectionId} not found`);
+    }
+
+    // Initialize activeSyncs if not present
+    if (!connection.activeSyncs) {
+      connection.activeSyncs = [];
+    }
+
+    // Check if sync is active
+    const syncIndex = connection.activeSyncs.indexOf(syncName);
+    if (syncIndex === -1) {
+      throw new Error(`Sync '${syncName}' is not active`);
+    }
+
+    // Remove from active syncs
+    connection.activeSyncs.splice(syncIndex, 1);
+    await this.connectionStore.update(connection);
+
+    // Unschedule the sync
+    await this.syncEngine.unscheduleConnectionSync(connectionId, syncName);
+
+    console.log(
+      `Deactivated sync '${syncName}' for connection '${connectionId}'`
+    );
+  }
+
+  /**
+   * Schedule syncs for a connection (only specified syncs, or all active syncs if not specified)
+   */
+  async scheduleConnectionSyncs(
+    connectionId: string,
+    syncInterval?: number,
+    syncNames?: string[]
+  ): Promise<void> {
+    const connection = await this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection ${connectionId} not found`);
+    }
+
+    const syncsToSchedule = syncNames || connection.activeSyncs || [];
+
+    for (const syncName of syncsToSchedule) {
+      if (syncInterval) {
+        await this.syncEngine.scheduleConnectionSync(
+          connectionId,
+          syncName,
+          syncInterval
+        );
+      } else {
+        await this.syncEngine.scheduleConnectionSync(connectionId, syncName);
+      }
+    }
+  }
+
+  /**
+   * Schedule all possible syncs for a connection
+   */
+  async scheduleAllConnectionSyncs(
+    connectionId: string,
+    syncInterval?: number
+  ): Promise<void> {
+    if (syncInterval) {
+      return this.syncEngine.scheduleAllConnectionSyncs(
+        connectionId,
+        syncInterval
+      );
+    } else {
+      return this.syncEngine.scheduleAllConnectionSyncs(connectionId);
+    }
+  }
+
+  /**
+   * Unschedule all possible syncs for a connection
+   */
+  async unscheduleAllConnectionSyncs(connectionId: string): Promise<void> {
+    return this.syncEngine.unscheduleAllConnectionSyncs(connectionId);
   }
 
   /**
@@ -224,8 +364,43 @@ export class DatabiteEngine {
   /**
    * Get all scheduled jobs
    */
-  async getScheduledJobs(): Promise<ScheduledJob[]> {
+  async getAllScheduledJobs(): Promise<ScheduledJob[]> {
     return this.syncEngine.getJobs();
+  }
+
+  /**
+   * Get all scheduled jobs with pagination
+   */
+  async getScheduledJobs(
+    params?: PaginationParams
+  ): Promise<PaginatedResponse<ScheduledJob>> {
+    // Get all jobs from sync engine
+    const allJobs = await this.syncEngine.getJobs();
+    const total = allJobs.length;
+
+    // Default pagination values
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 10;
+
+    // Calculate pagination
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    // Slice the data for the current page
+    const data = allJobs.slice(startIndex, endIndex);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   /**
@@ -344,10 +519,12 @@ export class DatabiteEngine {
   }
 
   /**
-   * Get all connections from the database
+   * Get all connections from the connection store with pagination
    */
-  async getConnections(): Promise<Connection<any>[]> {
-    return await this.connectionStore.readAll();
+  async getConnections(
+    params?: PaginationParams
+  ): Promise<PaginatedResponse<Connection<any>>> {
+    return await this.connectionStore.readAll(params);
   }
 
   /**
@@ -365,7 +542,7 @@ export class DatabiteEngine {
   }
 
   /**
-   * Get a connection by ID from the database
+   * Get a connection by ID from the connection store
    */
   async getConnection(
     connectionId: string

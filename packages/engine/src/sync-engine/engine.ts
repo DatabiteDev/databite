@@ -13,7 +13,6 @@ import { Scheduler } from "./scheduler";
  */
 export class SyncEngine {
   private scheduler: Scheduler;
-  private minutesBetweenSyncs: number;
   private getConnection: (id: string) => Promise<Connection<any> | undefined>;
   private getIntegration: (id: string) => Integration<any> | undefined;
   private getConnector: (id: string) => Connector<any, any> | undefined;
@@ -24,7 +23,6 @@ export class SyncEngine {
   private rateLimiter: RateLimiter;
 
   constructor(config: SyncEngineConfig) {
-    this.minutesBetweenSyncs = config.minutesBetweenSyncs;
     this.getConnection = config.getConnection;
     this.getIntegration = config.getIntegration;
     this.getConnector = config.getConnector;
@@ -35,9 +33,72 @@ export class SyncEngine {
   }
 
   /**
+   * Schedule a single sync for a connection
+   */
+  async scheduleConnectionSync(
+    connectionId: string,
+    syncName: string,
+    syncInterval?: number
+  ): Promise<void> {
+    const connection = await this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection '${connectionId}' not found`);
+    }
+
+    const integration = this.getIntegration(connection.integrationId);
+    if (!integration) {
+      throw new Error(`Integration '${connection.integrationId}' not found`);
+    }
+
+    const connector = this.getConnector(integration.connectorId);
+    if (!connector) {
+      throw new Error(`Connector '${integration.connectorId}' not found`);
+    }
+
+    // Verify sync exists
+    const sync = connector.syncs[syncName];
+    if (!sync) {
+      throw new Error(
+        `Sync '${syncName}' not found in connector '${connector.id}'`
+      );
+    }
+
+    const jobId = `${connectionId}-${syncName}`;
+    const interval = syncInterval || connection.syncInterval;
+
+    await this.scheduler.scheduleJob(
+      jobId,
+      syncName,
+      { connectionId, syncName },
+      interval
+    );
+
+    console.log(
+      `Scheduled sync '${syncName}' for connection '${connectionId}'`
+    );
+  }
+
+  /**
+   * Unschedule a single sync for a connection
+   */
+  async unscheduleConnectionSync(
+    connectionId: string,
+    syncName: string
+  ): Promise<void> {
+    const jobId = `${connectionId}-${syncName}`;
+    await this.scheduler.unscheduleJob(jobId);
+    console.log(
+      `Unscheduled sync '${syncName}' for connection '${connectionId}'`
+    );
+  }
+
+  /**
    * Schedule syncs for a connector connection
    */
-  async scheduleConnectionSyncs(connectionId: string): Promise<void> {
+  async scheduleAllConnectionSyncs(
+    connectionId: string,
+    syncInterval?: number
+  ): Promise<void> {
     const connection = await this.getConnection(connectionId);
     if (!connection) {
       throw new Error(`Connection '${connectionId}' not found`);
@@ -55,13 +116,13 @@ export class SyncEngine {
 
     for (const [syncName, _sync] of Object.entries(connector.syncs)) {
       const jobId = `${connectionId}-${syncName}`;
-      const schedule = this.minutesBetweenSyncs;
+      const interval = syncInterval || connection.syncInterval;
 
       await this.scheduler.scheduleJob(
         jobId,
         syncName,
         { connectionId, syncName },
-        schedule
+        interval
       );
 
       console.log(
@@ -73,7 +134,7 @@ export class SyncEngine {
   /**
    * Unschedule syncs for a connector connection
    */
-  async unscheduleConnectionSyncs(connectionId: string): Promise<void> {
+  async unscheduleAllConnectionSyncs(connectionId: string): Promise<void> {
     await this.scheduler.unscheduleConnectionJobs(connectionId);
     console.log(`Unscheduled syncs for connection '${connectionId}'`);
   }

@@ -19,15 +19,15 @@ export class Scheduler {
     jobId: string,
     syncName: string,
     data: SyncJobData,
-    schedule: number
+    syncInterval: number
   ): Promise<void> {
-    const nextRun = this.calculateNextRun(schedule);
+    const nextRun = this.calculateNextRun(syncInterval);
 
     const job: ScheduledJob = {
       id: jobId,
       connectionId: data.connectionId,
       syncName,
-      schedule,
+      syncInterval,
       nextRun,
       isActive: true,
     };
@@ -41,13 +41,13 @@ export class Scheduler {
 
     const delay = job.nextRun.getTime() - Date.now();
     if (delay < 0) {
-      job.nextRun = this.calculateNextRun(job.schedule);
+      job.nextRun = this.calculateNextRun(job.syncInterval);
       return this.scheduleNextRun(job);
     }
 
     const timer = setTimeout(async () => {
       await this.executeJob(job);
-      job.nextRun = this.calculateNextRun(job.schedule);
+      job.nextRun = this.calculateNextRun(job.syncInterval);
       this.scheduleNextRun(job);
     }, delay);
 
@@ -117,9 +117,9 @@ export class Scheduler {
     this.jobs.clear();
   }
 
-  private calculateNextRun(schedule: number): Date {
+  private calculateNextRun(syncInterval: number): Date {
     const now = new Date();
-    // Schedule is in minutes, convert to milliseconds
-    return new Date(now.getTime() + schedule * 60 * 1000);
+    // Sync Interval is in minutes, convert to milliseconds
+    return new Date(now.getTime() + syncInterval * 60 * 1000);
   }
 }

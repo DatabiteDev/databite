@@ -1,5 +1,17 @@
 # example-webapp
 
+## 3.0.0
+
+### Major Changes
+
+- Creation of dashboard package
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connect@5.0.0
+  - @databite/types@7.0.0
+
 ## 2.0.0
 
 ### Major Changes

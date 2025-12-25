@@ -1,6 +1,6 @@
 {
   "name": "@databite/connect",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "type": "module",
   "description": "A set of reusable React components and UI primitives for creating connections to Databite connectors in web applications.",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "react-hook-form": "^7.63.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.13",
-    "zod": "^4.1.11",
+    "zod": "workspace:*",
     "rimraf": "^6.0.0"
   },
   "devDependencies": {

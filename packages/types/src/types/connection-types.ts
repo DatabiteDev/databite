@@ -13,6 +13,10 @@ export interface Connection<TConnectionConfig extends z.ZodType> {
   connectorId: string;
   /** Connector Configuration */
   config: z.infer<TConnectionConfig>;
+  /** Default Interval in minutes between syncs */
+  syncInterval: number;
+  /** Array of sync names that are currently active */
+  activeSyncs?: string[];
   /** Metadata for the connection*/
   metadata?: Record<string, any>;
 }

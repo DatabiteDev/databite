@@ -22,12 +22,6 @@ server/
 npm install @databite/server @databite/engine @databite/types
 ```
 
-**Required Dependencies:**
-
-```bash
-npm install express helmet express-rate-limit typescript
-```
-
 ## 🎯 Overview
 
 The `@databite/server` package provides a ready-to-use Express server with RESTful API endpoints for connectors, integrations, connections, flows, sync operations, and actions. Includes built-in security features like rate limiting, CORS protection, security headers, IP filtering, input sanitization, request validation, and request size limits.
@@ -91,7 +85,6 @@ const server = new DatabiteServer({
   port: 3001,
   engineConfig: {
     connectors: [],
-    minutesBetweenSyncs: 10,
   },
 });
 

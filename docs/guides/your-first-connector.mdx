@@ -17,17 +17,9 @@ Before starting, make sure you have:
 
 ## Step 1: Create a Slack App
 
-First, create a Slack app at [api.slack.com/apps](https://api.slack.com/apps):
-
-1. Click "Create New App" → "From scratch"
-2. Name your app (e.g., "My Databite Connector")
-3. Select your workspace
-4. Go to "OAuth & Permissions" in the sidebar
-5. Add these scopes: `chat:write`, `channels:read`, `users:read`
-6. Go to "App Home" and enable "Home Tab"
-7. Install the app to your workspace
-
-Copy your Client ID, Client Secret, and note your Redirect URLs.
+- First, create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
+- Add these scopes: `chat:write`, `channels:read`, `users:read`
+- Copy your Client ID, Client Secret, and note your Redirect URLs.
 
 ## Step 2: Installation
 
@@ -148,7 +140,7 @@ export const fetchMessages = createSync<
 >({
   label: "Fetch Slack Messages",
   description: "Fetch recent messages from Slack channels",
-  schedule: "0 */6 * * *", // Every 6 hours
+  syncInterval: 360, // Every 6 hours (360 minutes)
   outputSchema: FetchMessagesOutputSchema,
   maxRetries: 3,
   timeout: 60000,
@@ -359,35 +351,26 @@ const server = new DatabiteServer({
   port: 3001,
   engineConfig: {
     connectors: [slack],
-    minutesBetweenSyncs: 60,
   },
 });
 
-server.addIntegration(integration);
-console.log("Server ready at http://localhost:3001");
+server.addIntegration(slack.createIntegration("Slack Integration", {
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      redirectUri: process.env.SLACK_REDIRECT_URI!,
+      scopes: [
+        "chat:write",
+        "channels:read",
+        "users:read",
+        "team:read",
+        "channels:history",
+      ],
+    })
+);
 ```
 
 ## Next Steps
 
 - Add more actions (create channels, invite users, etc.)
 - Add more syncs (users, files, etc.)
-- Implement proper error handling and retries
-- Add webhook support for real-time updates
 - Contribute your connector to our repo for others to use
-
-## Troubleshooting
-
-**OAuth not working?**
-- Verify your redirect URI matches exactly in Slack app settings
-- Check that your scopes are correct
-- Ensure the app is installed to your workspace
-
-**API calls failing?**
-- Check your access token is valid
-- Verify rate limits aren't exceeded
-- Look at Slack API documentation for correct endpoints
-
-**Build errors?**
-- Make sure all imports are correct
-- Check TypeScript types match your schemas
-- Verify Zod schemas are properly defined

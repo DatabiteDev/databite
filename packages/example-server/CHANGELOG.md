@@ -1,5 +1,19 @@
 # example-server
 
+## 3.0.0
+
+### Major Changes
+
+- Creation of dashboard package
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connectors@6.0.0
+  - @databite/engine@5.0.0
+  - @databite/server@4.0.0
+  - @databite/types@7.0.0
+
 ## 2.0.0
 
 ### Major Changes

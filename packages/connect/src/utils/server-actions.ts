@@ -22,13 +22,29 @@ export type ActionMetadata = {
   description?: string;
   maxRetries?: number;
   timeout?: number;
+  inputSchema: any;
+  outputSchema: any;
+};
+
+export type SyncMetadata = {
+  name: string;
+  id: string;
+  label: string;
+  description?: string;
+  maxRetries?: number;
+  timeout?: number;
+  outputSchema: any;
+};
+
+export type SyncWithStatus = SyncMetadata & {
+  isActive: boolean;
 };
 
 export type JobInfo = {
   id: string;
   connectionId: string;
   syncName: string;
-  schedule: string;
+  syncInterval: string;
   nextRun?: Date;
   lastRun?: Date;
 };
@@ -46,6 +62,29 @@ export type StatusResponse = {
     integrations: number;
     connections: number;
     scheduledJobs: number;
+  };
+};
+
+/**
+ * Pagination parameters for API requests
+ */
+export type PaginationParams = {
+  page?: number;
+  limit?: number;
+};
+
+/**
+ * Paginated response from the API
+ */
+export type PaginatedResponse<T> = {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
 };
 
@@ -101,6 +140,37 @@ export async function getConnector(
   } catch (error) {
     console.error(`Error fetching connector ${id}:`, error);
     return null;
+  }
+}
+
+/**
+ * Get all syncs for a connector
+ */
+export async function getConnectorSyncs(
+  apiUrl: string,
+  connectorId: string
+): Promise<SyncMetadata[]> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/connectors/${connectorId}/syncs`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch connector syncs: ${response.statusText}`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching syncs for connector ${connectorId}:`, error);
+    return [];
   }
 }
 
@@ -199,13 +269,26 @@ export async function getIntegrationsWithConnectors(
 // ============================================================================
 
 /**
- * Fetch all connections from the server
+ * Fetch connections from the server with pagination
  */
 export async function getConnections(
-  apiUrl: string
-): Promise<Connection<any>[]> {
+  apiUrl: string,
+  params?: PaginationParams
+): Promise<PaginatedResponse<Connection<any>>> {
   try {
-    const response = await fetch(`${apiUrl}/api/connections`, {
+    const queryParams = new URLSearchParams();
+    if (params?.page) {
+      queryParams.append("page", params.page.toString());
+    }
+    if (params?.limit) {
+      queryParams.append("limit", params.limit.toString());
+    }
+
+    const url = `${apiUrl}/api/connections${
+      queryParams.toString() ? `?${queryParams.toString()}` : ""
+    }`;
+
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -219,7 +302,17 @@ export async function getConnections(
     return await response.json();
   } catch (error) {
     console.error("Error fetching connections:", error);
-    return [];
+    return {
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
   }
 }
 
@@ -278,6 +371,35 @@ export async function addConnection(
 }
 
 /**
+ * Update an existing connection
+ */
+export async function updateConnection(
+  apiUrl: string,
+  id: string,
+  connection: Connection<any>
+): Promise<Connection<any> | null> {
+  try {
+    const response = await fetch(`${apiUrl}/api/connections/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(connection),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update connection: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.connection;
+  } catch (error) {
+    console.error(`Error updating connection ${id}:`, error);
+    return null;
+  }
+}
+
+/**
  * Remove a connection from the server
  */
 export async function removeConnection(
@@ -301,6 +423,177 @@ export async function removeConnection(
     console.error(`Error removing connection ${id}:`, error);
     return false;
   }
+}
+
+// ============================================================================
+// CONNECTION SYNC MANAGEMENT ROUTES
+// ============================================================================
+
+/**
+ * Get available syncs for a connection with their activation status
+ */
+export async function getAvailableSyncs(
+  apiUrl: string,
+  connectionId: string
+): Promise<SyncWithStatus[]> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/connections/${connectionId}/syncs`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch available syncs: ${response.statusText}`
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(
+      `Error fetching available syncs for connection ${connectionId}:`,
+      error
+    );
+    return [];
+  }
+}
+
+/**
+ * Activate a sync for a connection
+ */
+export async function activateSync(
+  apiUrl: string,
+  connectionId: string,
+  syncName: string,
+  syncInterval?: number
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/connections/${connectionId}/syncs/${syncName}/activate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ syncInterval }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to activate sync");
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      `Error activating sync ${syncName} for connection ${connectionId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Deactivate a sync for a connection
+ */
+export async function deactivateSync(
+  apiUrl: string,
+  connectionId: string,
+  syncName: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/connections/${connectionId}/syncs/${syncName}/deactivate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to deactivate sync");
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      `Error deactivating sync ${syncName} for connection ${connectionId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Bulk activate multiple syncs for a connection
+ */
+export async function activateMultipleSyncs(
+  apiUrl: string,
+  connectionId: string,
+  syncNames: string[],
+  syncInterval?: number
+): Promise<{
+  succeeded: string[];
+  failed: Array<{ sync: string; error: string }>;
+}> {
+  const results = {
+    succeeded: [] as string[],
+    failed: [] as Array<{ sync: string; error: string }>,
+  };
+
+  for (const syncName of syncNames) {
+    try {
+      await activateSync(apiUrl, connectionId, syncName, syncInterval);
+      results.succeeded.push(syncName);
+    } catch (error) {
+      results.failed.push({
+        sync: syncName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Bulk deactivate multiple syncs for a connection
+ */
+export async function deactivateMultipleSyncs(
+  apiUrl: string,
+  connectionId: string,
+  syncNames: string[]
+): Promise<{
+  succeeded: string[];
+  failed: Array<{ sync: string; error: string }>;
+}> {
+  const results = {
+    succeeded: [] as string[],
+    failed: [] as Array<{ sync: string; error: string }>,
+  };
+
+  for (const syncName of syncNames) {
+    try {
+      await deactivateSync(apiUrl, connectionId, syncName);
+      results.succeeded.push(syncName);
+    } catch (error) {
+      results.failed.push({
+        sync: syncName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return results;
 }
 
 // ============================================================================
@@ -419,11 +712,26 @@ export async function deleteFlowSession(
 // ============================================================================
 
 /**
- * Get all scheduled sync jobs
+ * Get all scheduled sync jobs with pagination
  */
-export async function getScheduledJobs(apiUrl: string): Promise<JobInfo[]> {
+export async function getScheduledJobs(
+  apiUrl: string,
+  params?: PaginationParams
+): Promise<PaginatedResponse<JobInfo>> {
   try {
-    const response = await fetch(`${apiUrl}/api/sync/jobs`, {
+    const queryParams = new URLSearchParams();
+    if (params?.page) {
+      queryParams.append("page", params.page.toString());
+    }
+    if (params?.limit) {
+      queryParams.append("limit", params.limit.toString());
+    }
+
+    const url = `${apiUrl}/api/sync/jobs${
+      queryParams.toString() ? `?${queryParams.toString()}` : ""
+    }`;
+
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -437,7 +745,17 @@ export async function getScheduledJobs(apiUrl: string): Promise<JobInfo[]> {
     return await response.json();
   } catch (error) {
     console.error("Error fetching scheduled jobs:", error);
-    return [];
+    return {
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrev: false,
+      },
+    };
   }
 }
 
@@ -499,6 +817,75 @@ export async function executeSync(
       error
     );
     return null;
+  }
+}
+
+/**
+ * Schedule syncs for a connection
+ * @param syncInterval - Optional custom sync interval in minutes
+ * @param syncNames - Optional array of specific sync names to schedule (defaults to activeSyncs)
+ */
+export async function scheduleConnectionSyncs(
+  apiUrl: string,
+  connectionId: string,
+  syncInterval?: number,
+  syncNames?: string[]
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/sync/schedule/${connectionId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ syncInterval, syncNames }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to schedule syncs: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      `Error scheduling syncs for connection ${connectionId}:`,
+      error
+    );
+    return false;
+  }
+}
+
+/**
+ * Unschedule all syncs for a connection
+ */
+export async function unscheduleConnectionSyncs(
+  apiUrl: string,
+  connectionId: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/sync/schedule/${connectionId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to unschedule syncs: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error(
+      `Error unscheduling syncs for connection ${connectionId}:`,
+      error
+    );
+    return false;
   }
 }
 

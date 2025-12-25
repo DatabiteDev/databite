@@ -19,12 +19,29 @@ The example server is available in our open-source repository:
   Explore the complete implementation with source code and configuration
 </Card>
 
-## Steps
+## Getting Started
 
-1. Install dependencies
+### Prerequisites
+
+- Node.js >= 16.0.0
+- npm, yarn, pnpm, or bun
+
+### Steps
+
+1. Installation
 
 ```bash
-npm install @databite/server
+# Clone the repository
+git clone https://github.com/DatabiteDev/databite.git
+cd databite/packages/example-server
+
+# Install dependencies
+npm install
+
+# Or with other package managers
+yarn install
+pnpm install
+bun install
 ```
 
 2. Configure environment
@@ -36,34 +53,16 @@ SLACK_CLIENT_SECRET=your-slack-client-secret
 SLACK_REDIRECT_URI=http://localhost:3001/auth/slack/callback
 ```
 
-3. Run the server
+3. Start the development server:
 
-```typescript
-import { DatabiteServer } from "@databite/server";
-import { slack } from "@databite/connectors";
-
-async function main() {
-  const server = new DatabiteServer({
-    port: 3001,
-    engineConfig: {
-      connectors: [slack],
-      minutesBetweenSyncs: 10,
-    },
-  });
-
-  await server.addIntegration(
-    slack.createIntegration("Slack Integration", {
-      clientId: process.env.SLACK_CLIENT_ID!,
-      clientSecret: process.env.SLACK_CLIENT_SECRET!,
-      redirectUri: process.env.SLACK_REDIRECT_URI!,
-      scopes: ["chat:write", "channels:read"],
-    })
-  );
-
-  console.log("Server running at http://localhost:3001");
-}
-
-main().catch(console.error);
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
 4. Test endpoints

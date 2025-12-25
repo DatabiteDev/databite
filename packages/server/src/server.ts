@@ -1,3 +1,4 @@
+import * as z from "zod";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { DatabiteEngine, EngineConfig } from "@databite/engine";
@@ -103,10 +104,32 @@ export class DatabiteServer {
       strictLimiter,
       this.addConnection.bind(this)
     );
+    this.app.put(
+      "/api/connections/:id",
+      strictLimiter,
+      this.updateConnection.bind(this)
+    );
     this.app.delete(
       "/api/connections/:id",
       strictLimiter,
       this.removeConnection.bind(this)
+    );
+
+    // Connection sync management routes
+    this.app.post(
+      "/api/connections/:connectionId/syncs/:syncName/activate",
+      strictLimiter,
+      this.activateSync.bind(this)
+    );
+    this.app.post(
+      "/api/connections/:connectionId/syncs/:syncName/deactivate",
+      strictLimiter,
+      this.deactivateSync.bind(this)
+    );
+    this.app.get(
+      "/api/connections/:connectionId/syncs",
+      moderateLimiter,
+      this.getAvailableSyncs.bind(this)
     );
 
     // Flow routes (write operations, stricter limits)
@@ -142,6 +165,21 @@ export class DatabiteServer {
       "/api/sync/execute/:connectionId/:syncName",
       strictLimiter,
       this.executeSync.bind(this)
+    );
+    this.app.post(
+      "/api/sync/schedule/:connectionId",
+      strictLimiter,
+      this.scheduleConnectionSyncs.bind(this)
+    );
+    this.app.delete(
+      "/api/sync/schedule/:connectionId",
+      strictLimiter,
+      this.unscheduleConnectionSyncs.bind(this)
+    );
+    this.app.get(
+      "/api/connectors/:id/syncs",
+      moderateLimiter,
+      this.getConnectorSyncs.bind(this)
     );
 
     // Action routes
@@ -233,10 +271,26 @@ export class DatabiteServer {
   }
 
   // Connection route handlers
-  private async getConnections(_req: Request, res: Response) {
+  private async getConnections(req: Request, res: Response) {
     try {
-      const connections = await this.engine.getConnections();
-      return res.json(connections);
+      // Parse query parameters for pagination
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string, 10)
+        : 10;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        return res.status(400).json({ error: "Page must be greater than 0" });
+      }
+      if (limit < 1 || limit > 100) {
+        return res
+          .status(400)
+          .json({ error: "Limit must be between 1 and 100" });
+      }
+
+      const result = await this.engine.getConnections({ page, limit });
+      return res.json(result);
     } catch (error) {
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Internal server error",
@@ -285,6 +339,124 @@ export class DatabiteServer {
           error instanceof Error
             ? error.message
             : "Failed to remove connection",
+      });
+    }
+  }
+
+  private async updateConnection(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const connectionData = req.body as Connection<any>;
+
+      // Ensure the ID in the URL matches the ID in the body
+      if (connectionData.id && connectionData.id !== id) {
+        return res.status(400).json({
+          error: "Connection ID in URL does not match ID in body",
+        });
+      }
+
+      // Set the ID from URL to ensure consistency
+      connectionData.id = id;
+
+      const updatedConnection = await this.engine.updateConnection(
+        connectionData
+      );
+      return res.json({
+        message: "Connection updated successfully",
+        connection: updatedConnection,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update connection",
+      });
+    }
+  }
+
+  // Connection sync management handlers
+  private async activateSync(req: Request, res: Response) {
+    try {
+      const { connectionId, syncName } = req.params;
+      const { syncInterval } = req.body;
+
+      await this.engine.activateSync(connectionId, syncName, syncInterval);
+      return res.json({
+        message: `Sync '${syncName}' activated successfully`,
+        connectionId,
+        syncName,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error ? error.message : "Failed to activate sync",
+      });
+    }
+  }
+
+  private async deactivateSync(req: Request, res: Response) {
+    try {
+      const { connectionId, syncName } = req.params;
+      await this.engine.deactivateSync(connectionId, syncName);
+      return res.json({
+        message: `Sync '${syncName}' deactivated successfully`,
+        connectionId,
+        syncName,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error ? error.message : "Failed to deactivate sync",
+      });
+    }
+  }
+
+  private async getAvailableSyncs(req: Request, res: Response) {
+    try {
+      const { connectionId } = req.params;
+
+      // Get connection to find its connector
+      const connection = await this.engine.getConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      // Get integration
+      const integration = this.engine.getIntegrationById(
+        connection.integrationId
+      );
+      if (!integration) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+
+      // Get connector
+      const connector = this.engine.getConnectorById(integration.connectorId);
+      if (!connector) {
+        return res.status(404).json({ error: "Connector not found" });
+      }
+
+      const activeSyncs = connection.activeSyncs || [];
+
+      // Map all available syncs with their active status
+      const syncs = Object.entries(connector.syncs).map(([syncName, sync]) => ({
+        name: syncName,
+        id: sync.id,
+        label: sync.label,
+        description: sync.description,
+        maxRetries: sync.maxRetries,
+        timeout: sync.timeout,
+        isActive: activeSyncs.includes(syncName),
+        outputSchema: z.toJSONSchema(sync.outputSchema),
+      }));
+
+      return res.json(syncs);
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to get available syncs",
       });
     }
   }
@@ -347,10 +519,26 @@ export class DatabiteServer {
   }
 
   // Sync route handlers
-  private async getScheduledJobs(_req: Request, res: Response) {
+  private async getScheduledJobs(req: Request, res: Response) {
     try {
-      const jobs = await this.engine.getScheduledJobs();
-      return res.json(jobs);
+      // Parse query parameters for pagination
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string, 10)
+        : 10;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        return res.status(400).json({ error: "Page must be greater than 0" });
+      }
+      if (limit < 1 || limit > 100) {
+        return res
+          .status(400)
+          .json({ error: "Limit must be between 1 and 100" });
+      }
+
+      const result = await this.engine.getScheduledJobs({ page, limit });
+      return res.json(result);
     } catch (error) {
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Internal server error",
@@ -383,6 +571,89 @@ export class DatabiteServer {
     }
   }
 
+  private async scheduleConnectionSyncs(req: Request, res: Response) {
+    try {
+      const { connectionId } = req.params;
+      const { syncInterval, syncNames } = req.body;
+
+      // Verify connection exists
+      const connection = await this.engine.getConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      await this.engine.scheduleConnectionSyncs(
+        connectionId,
+        syncInterval,
+        syncNames
+      );
+      return res.json({
+        message: "Connection syncs scheduled successfully",
+        connectionId,
+        scheduledSyncs: syncNames || connection.activeSyncs || [],
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          error instanceof Error ? error.message : "Failed to schedule syncs",
+      });
+    }
+  }
+
+  private async unscheduleConnectionSyncs(req: Request, res: Response) {
+    try {
+      const { connectionId } = req.params;
+
+      // Verify connection exists
+      const connection = await this.engine.getConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      await this.engine.unscheduleAllConnectionSyncs(connectionId);
+      return res.json({
+        message: "Connection syncs unscheduled successfully",
+        connectionId,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          error instanceof Error ? error.message : "Failed to unschedule syncs",
+      });
+    }
+  }
+
+  private async getConnectorSyncs(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const connector = this.engine.getConnectorById(id);
+      if (!connector) {
+        return res.status(404).json({ error: "Connector not found" });
+      }
+
+      const syncs = Object.entries(connector.syncs || {}).map(
+        ([key, sync]) => ({
+          name: key,
+          id: sync.id,
+          label: sync.label,
+          description: sync.description,
+          maxRetries: sync.maxRetries,
+          timeout: sync.timeout,
+          outputSchema: z.toJSONSchema(sync.outputSchema),
+        })
+      );
+
+      return res.json(syncs);
+    } catch (error) {
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to get connector syncs",
+      });
+    }
+  }
+
   // Action route handlers
   private async getConnectorActions(req: Request, res: Response) {
     try {
@@ -400,6 +671,8 @@ export class DatabiteServer {
           description: action.description,
           maxRetries: action.maxRetries,
           timeout: action.timeout,
+          inputSchema: z.toJSONSchema(action.inputSchema),
+          outputSchema: z.toJSONSchema(action.outputSchema),
         })
       );
 
@@ -442,8 +715,8 @@ export class DatabiteServer {
     try {
       const connectors = this.engine.getConnectors();
       const integrations = this.engine.getIntegrations();
-      const connections = await this.engine.getConnections();
-      const jobs = await this.engine.getScheduledJobs();
+      const connectionsResult = await this.engine.getConnections();
+      const jobsResult = await this.engine.getScheduledJobs();
 
       return res.json({
         status: "running",
@@ -451,8 +724,8 @@ export class DatabiteServer {
         stats: {
           connectors: connectors.length,
           integrations: integrations.length,
-          connections: connections.length,
-          scheduledJobs: jobs.length,
+          connections: connectionsResult.pagination.total,
+          scheduledJobs: jobsResult.pagination.total,
         },
       });
     } catch (error) {

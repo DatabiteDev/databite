@@ -1,0 +1,90 @@
+---
+title: "Hosting the Dashboard"
+description: "Guide to self-host the Databite dashboard for managing your connectors and connections"
+---
+
+## Overview
+
+The Databite dashboard is a Next.js application that provides a web interface for managing your Databite server. This guide covers how to clone, configure, and deploy the dashboard.
+
+## Prerequisites
+
+- Node.js >= 18.0.0
+- A running Databite server
+- Git
+
+## Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/DatabiteDev/databite.git
+cd databite/packages/dashboard
+```
+
+## Step 2: Install Dependencies
+
+```bash
+npm install
+```
+
+## Step 3: Configure Environment Variables
+
+Create a `.env.local` file in the dashboard directory:
+
+```bash
+# URL of your Databite server
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+## Step 4: Build and Run Locally
+
+```bash
+# Development mode
+npm run dev
+
+# Production build
+npm run build
+npm start
+```
+
+The dashboard will be available at `http://localhost:3000`.
+
+## Deployment Options
+
+The dashboard can be deployed to any platform that supports Next.js:
+
+- **Vercel**
+- **Netlify**
+- **Heroku**
+- **Self-hosted**
+
+## Security Configuration
+
+Ensure your Databite server allows requests from your dashboard domain:
+
+```typescript
+const server = new DatabiteServer({
+  // ... other config
+  security: {
+    allowedOrigins: ["https://your-dashboard-domain.com"],
+    enableHelmet: true,
+    enableRateLimit: true,
+  },
+});
+```
+
+## Troubleshooting
+
+- Verify `NEXT_PUBLIC_API_URL` is correct
+- Check CORS settings on your server
+- Ensure the server is running and accessible
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Server Setup" icon="server" href="/guides/setting-up-your-first-server">
+    Learn how to set up your Databite server
+  </Card>
+  <Card title="Dashboard API" icon="book" href="/packages/dashboard">
+    Explore dashboard features and configuration
+  </Card>
+</CardGroup>
