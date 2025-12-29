@@ -1,5 +1,13 @@
 # @databite/engine
 
+## 5.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/types@8.0.0
+  - @databite/build@6.0.1
+
 ## 5.0.0
 
 ### Major Changes

@@ -1,5 +1,17 @@
 # example-webapp
 
+## 4.0.0
+
+### Major Changes
+
+- Added external id
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/connect@6.0.0
+  - @databite/types@8.0.0
+
 ## 3.0.0
 
 ### Major Changes

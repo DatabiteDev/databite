@@ -49,6 +49,7 @@ const connectionFormSchema = z.object({
   integrationId: z
     .string()
     .min(1, { message: "Please select an integration." }),
+  externalId: z.string().min(1, { message: "Please provide an external ID." }),
   syncInterval: z
     .number()
     .min(1, { message: "Sync interval must be at least 1 minute." })
@@ -74,6 +75,7 @@ export function CreateConnectionForm({
     useState<IntegrationsWithConnector | null>(null);
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
   const [syncInterval, setSyncInterval] = useState(1);
+  const [externalId, setExternalId] = useState("");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -113,6 +115,7 @@ export function CreateConnectionForm({
 
     setSelectedIntegration(integration);
     setSyncInterval(data.syncInterval);
+    setExternalId(data.externalId);
 
     // 1️⃣ Close Radix Dialog first
     setIsDialogOpen(false);
@@ -245,6 +248,24 @@ export function CreateConnectionForm({
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="externalId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>External ID</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <Button type="submit" disabled={isLoadingIntegrations}>
                 Continue
               </Button>
@@ -256,6 +277,7 @@ export function CreateConnectionForm({
       <ConnectModal
         open={isConnectModalOpen}
         onOpenChange={handleConnectModalClose}
+        externalId={externalId}
         integrationId={selectedIntegration?.integration.id}
         baseUrl={apiUrl}
         syncInterval={syncInterval}

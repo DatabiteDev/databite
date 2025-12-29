@@ -100,6 +100,7 @@ export default function App() {
           <ConnectModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
+            externalId={"sh723wedbx3ew"}
             integrationId={integration.integration.id}
             baseUrl={apiUrl}
             syncInterval={1}

@@ -1,5 +1,16 @@
 # @databite/connect
 
+## 6.0.0
+
+### Major Changes
+
+- Added external id
+
+### Patch Changes
+
+- Updated dependencies
+  - @databite/types@8.0.0
+
 ## 5.0.0
 
 ### Major Changes

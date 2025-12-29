@@ -15,6 +15,8 @@ export interface ConnectModalProps {
   open: boolean;
   /** Callback when the modal open state changes */
   onOpenChange: (open: boolean) => void;
+  /** Unique external identifier for the connection */
+  externalId: string;
   /** Integration ID to authenticate */
   integrationId: string;
   /** Interval in minutes between syncs for the connection*/
@@ -30,6 +32,7 @@ export interface ConnectModalProps {
 export function ConnectModal({
   open,
   onOpenChange,
+  externalId,
   integrationId,
   syncInterval,
   baseUrl,
@@ -163,6 +166,7 @@ export function ConnectModal({
         // Create connection object
         const connection: Connection<any> = {
           id: `conn_${integrationId}_${Date.now()}`,
+          externalId,
           integrationId,
           connectorId: connectorId,
           syncInterval,

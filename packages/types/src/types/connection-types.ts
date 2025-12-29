@@ -7,6 +7,8 @@ import { z } from "zod";
 export interface Connection<TConnectionConfig extends z.ZodType> {
   /** Unique identifier for the connection */
   id: string;
+  /** Unique external identifier for the connection */
+  externalId: string;
   /** ID of the integration this connection belongs to */
   integrationId: string;
   /** ID of the connector this connection belongs to */

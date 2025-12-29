@@ -1,5 +1,11 @@
 # @databite/types
 
+## 8.0.0
+
+### Major Changes
+
+- Added external id
+
 ## 7.0.0
 
 ### Major Changes

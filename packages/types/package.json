@@ -1,6 +1,6 @@
 {
   "name": "@databite/types",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "description": "A library of types for the Databite SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -335,6 +335,12 @@ export default function ConnectionPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="text-sm font-medium">External ID</label>
+                  <p className="text-sm text-muted-foreground">
+                    {connection.externalId}
+                  </p>
+                </div>
+                <div>
                   <label className="text-sm font-medium">Connection ID</label>
                   <p className="text-sm text-muted-foreground">
                     {connection.id}
